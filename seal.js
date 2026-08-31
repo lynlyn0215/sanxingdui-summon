@@ -198,9 +198,12 @@ function pick() {
 function startGame() {
   show('s-play');
   fitCanvas();
+  Summon.init($('scene3d'));
   Object.assign(state, { running: true, round: 0, score: 0, combo: 0, maxCombo: 0, hits: 0, bag: [] });
   $('score').textContent = '0';
   $('combo').textContent = '';
+  ['prompt', 'timebar', 'live', 'hud'].forEach(id => { $(id).style.display = ''; });
+  $('finale').classList.remove('on');
   nextRound();
   state.rafId = requestAnimationFrame(loop);
 }
@@ -231,18 +234,19 @@ function onHit() {
   state.hits++;
   state.combo++;
   state.maxCombo = Math.max(state.maxCombo, state.combo);
-  /* 计分：基础分 + 速度奖励 + 连击倍率 */
   const left = Math.max(0, state.tEnd - performance.now());
   const speed = Math.round(120 * (left / state.tLimit));
-  const gain = Math.round((100 + speed) * (1 + (state.combo - 1) * 0.25));
-  state.score += gain;
-  $('score').textContent = state.score;
+  state.score += Math.round((100 + speed) * (1 + (state.combo - 1) * 0.25));
   $('combo').textContent = state.combo >= 2 ? state.combo + ' 连' : '';
-  flash('成', 'hit');
   sHit(state.combo);
   if (navigator.vibrate) navigator.vibrate(30);
   burst();
-  setTimeout(nextRound, 620);
+  /* 奖励画面：一块碎片从黑暗中飞回、嵌进面具（取代分数弹窗） */
+  Summon.landShard(state.hits - 1);
+  $('p-name').textContent = '';
+  $('p-hint').textContent = '';
+  $('p-src').textContent = '';
+  setTimeout(nextRound, 900);   /* 留出碎片飞行时间 */
 }
 
 function onMiss() {
@@ -255,36 +259,32 @@ function onMiss() {
   setTimeout(nextRound, 700);
 }
 
+/* 结束：不弹分数评价，而是让复原的面具在你眼前亮起 */
 function endGame() {
   state.running = false;
-  cancelAnimationFrame(state.rafId);
-  if (state.stream) { state.stream.getTracks().forEach(t => t.stop()); state.stream = null; }
+  const allDone = state.hits >= ROUNDS;
+
+  $('prompt').style.display = 'none';
+  $('timebar').style.display = 'none';
+  $('live').style.display = 'none';
+  $('hud').style.display = 'none';
+
+  if (allDone) Summon.complete();
   sEnd();
-  const acc = Math.round(state.hits / ROUNDS * 100);
-  $('end-score').textContent = state.score;
-  $('end-title').textContent = acc === 100 ? '印 印 相 合' : acc >= 60 ? '通 神 有 门' : '手 生';
-  $('end-rows').innerHTML =
-    '<div><span>结印</span>' + state.hits + ' / ' + ROUNDS + '</div>' +
-    '<div><span>准度</span>' + acc + '%</div>' +
-    '<div><span>最高连击</span>' + state.maxCombo + '</div>';
-  show('s-end');
+  if (navigator.vibrate) navigator.vibrate([60, 40, 140]);
+
+  /* 面具悬浮旋转几秒，再浮出一行字 */
+  setTimeout(() => {
+    $('finale-title').textContent = allDone ? '纵目面具 · 已醒' : '它还缺 ' + (ROUNDS - state.hits) + ' 块';
+    $('finale-sub').textContent = allDone
+      ? '三千年前它被打碎掩埋，此刻在你掌中重聚'
+      : '再结一次印，把余下的碎片唤回来';
+    $('finale').classList.add('on');
+  }, allDone ? 2600 : 1200);
 }
 
-$('btn-again').addEventListener('click', async () => {
-  show('s-load');
-  $('load-bar').style.width = '60%';
-  try {
-    state.stream = await openCamera();
-    $('cam').srcObject = state.stream;
-    await $('cam').play();
-    $('load-bar').style.width = '100%';
-    setTimeout(startGame, 200);
-  } catch (e) {
-    show('s-intro');
-    $('intro-note').className = 'err';
-    $('intro-note').innerHTML = camError(e);
-  }
-});
+/* 摄像头一直开着，重开一局直接重载页面重置 3D 场景（最省事、也不会残留状态） */
+$('btn-again').addEventListener('click', () => location.reload());
 $('btn-quit').addEventListener('click', () => location.reload());
 
 /* ---------- 画布特效 ---------- */
