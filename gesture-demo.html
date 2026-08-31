@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>掌中古蜀 · 三星堆召唤</title>
+<style>
+  :root{
+    --ink:#0d0f0e; --ink2:#151917;
+    --bronze:#3d7a68; --bronze-dim:#24463c;
+    --gold:#d9b25c; --gold-hi:#f0d48a;
+    --paper:#e8e0cc; --paper-dim:#9a917c;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    background:var(--ink); color:var(--paper);
+    font-family:'Songti SC','STSong','Noto Serif CJK SC','SimSun',serif;
+    overflow:hidden; user-select:none;
+  }
+  /* 场景容器 */
+  .scene{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;text-align:center}
+  .scene.on{display:flex}
+  /* 通用 */
+  .kicker{font-size:13px;letter-spacing:.5em;color:var(--bronze);margin-bottom:18px}
+  h1{font-size:44px;font-weight:400;letter-spacing:.18em;color:var(--gold-hi);margin-bottom:14px}
+  h2{font-size:26px;font-weight:400;letter-spacing:.12em;color:var(--gold-hi);margin-bottom:10px}
+  .sub{font-size:15px;line-height:1.9;color:var(--paper-dim);max-width:30em}
+  .btn{
+    margin-top:34px;padding:14px 46px;font-family:inherit;font-size:17px;letter-spacing:.3em;text-indent:.3em;
+    color:var(--gold-hi);background:transparent;border:1px solid var(--gold);border-radius:2px;cursor:pointer;
+  }
+  .btn:active{background:rgba(217,178,92,.12)}
+  .btn.minor{border-color:var(--bronze-dim);color:var(--paper-dim);font-size:14px;padding:10px 28px;margin-top:14px}
+  .hairline{width:54px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:22px auto}
+  /* 开场 */
+  #scene-intro .glyph{font-size:15px;color:var(--bronze);letter-spacing:.9em;text-indent:.9em;margin-bottom:26px}
+  /* 问卜表单 */
+  .field{margin:16px 0;width:min(78vw,320px);text-align:left}
+  .field label{display:block;font-size:13px;letter-spacing:.3em;color:var(--bronze);margin-bottom:8px}
+  .field input[type=date],.field input[type=text]{
+    width:100%;padding:12px 10px;font-family:inherit;font-size:16px;color:var(--paper);
+    background:var(--ink2);border:1px solid var(--bronze-dim);border-radius:2px;outline:none;
+    color-scheme:dark;
+  }
+  .choice{display:flex;flex-direction:column;gap:10px}
+  .choice button{
+    padding:13px 12px;font-family:inherit;font-size:15px;letter-spacing:.08em;color:var(--paper);
+    background:var(--ink2);border:1px solid var(--bronze-dim);border-radius:2px;cursor:pointer;text-align:center;
+  }
+  .choice button.sel{border-color:var(--gold);color:var(--gold-hi)}
+  /* 推演 */
+  #divine-glyphs{font-size:64px;color:var(--gold);letter-spacing:.4em;text-indent:.4em;min-height:1.4em}
+  #divine-note{margin-top:26px;font-size:14px;color:var(--paper-dim);letter-spacing:.2em}
+  /* 召唤场景 */
+  #scene-summon{padding:0}
+  #cam-wrap{position:absolute;inset:0;background:#000}
+  #cam{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);filter:saturate(.55) contrast(1.05) brightness(.9)}
+  #overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  #summon-top{position:absolute;top:0;left:0;right:0;padding:46px 24px 60px;background:linear-gradient(rgba(13,15,14,.92),transparent);z-index:3}
+  #summon-tip{font-size:17px;letter-spacing:.15em;line-height:1.8;color:var(--gold-hi);text-shadow:0 1px 6px #000}
+  #summon-sub{margin-top:6px;font-size:13px;color:var(--paper-dim);letter-spacing:.1em}
+  #summon-bottom{position:absolute;bottom:0;left:0;right:0;padding:40px 24px 42px;background:linear-gradient(transparent,rgba(13,15,14,.94));z-index:3;text-align:center}
+  #gate{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--ink);padding:32px}
+  .privacy{font-size:13px;line-height:2;color:var(--paper-dim);max-width:26em;text-align:center}
+  .privacy b{color:var(--paper);font-weight:400}
+  #fallback-zone{position:absolute;inset:0;z-index:4;display:none;align-items:center;justify-content:center}
+  #fallback-zone .ring{width:150px;height:150px;border:1px dashed var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;letter-spacing:.2em;color:var(--gold-hi);line-height:1.8}
+  /* 揭晓 */
+  #scene-card{justify-content:flex-start;overflow-y:auto;padding-top:52px;padding-bottom:44px}
+  #seal-char{font-size:96px;color:var(--gold-hi);line-height:1.2;text-shadow:0 0 34px rgba(217,178,92,.45)}
+  #artifact-stage{width:190px;height:190px;margin:6px auto}
+  #artifact-stage svg{width:100%;height:100%}
+  #artifact-name{font-size:22px;letter-spacing:.3em;color:var(--gold-hi)}
+  #artifact-elem{font-size:12px;letter-spacing:.4em;color:var(--bronze);margin-top:6px}
+  #verdict{margin-top:16px;font-size:16px;line-height:2;color:var(--paper);max-width:24em}
+  #hypo{margin-top:14px;font-size:12.5px;line-height:1.9;color:var(--paper-dim);max-width:26em}
+  #card-preview{display:none;max-width:min(72vw,300px);border:1px solid var(--bronze-dim);margin-top:20px}
+  .rare-tag{display:none;margin-top:10px;font-size:12px;letter-spacing:.35em;color:var(--gold);border:1px solid var(--gold);padding:4px 12px}
+  #toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%);background:rgba(21,25,23,.95);border:1px solid var(--bronze-dim);color:var(--paper);font-size:14px;letter-spacing:.1em;padding:10px 22px;border-radius:2px;opacity:0;transition:opacity .3s;z-index:99;pointer-events:none}
+</style>
+</head>
+<body>
+
+<!-- S0 开场 -->
+<section class="scene on" id="scene-intro">
+  <div class="glyph">三星堆</div>
+  <h1>掌中古蜀</h1>
+  <div class="hairline"></div>
+  <p class="sub">三千年前，青铜大立人双手环握，立于祭台。<br>他掌中握着什么，至今无人知晓。<br><br>今夜，由你补全这个答案。</p>
+  <button class="btn" id="btn-start">问 卜 启 程</button>
+</section>
+
+<!-- S1 问卜 -->
+<section class="scene" id="scene-input">
+  <div class="kicker">问卜</div>
+  <h2>报上你的来历</h2>
+  <div class="field">
+    <label>生辰</label>
+    <input type="date" id="in-birth" value="2000-01-01" min="1920-01-01" max="2026-12-31">
+  </div>
+  <div class="field">
+    <label>称呼（缘分卡署名，可不填）</label>
+    <input type="text" id="in-name" maxlength="8" placeholder="有缘人">
+  </div>
+  <div class="field">
+    <label>若入夜的三星堆只许你做一件事</label>
+    <div class="choice">
+      <button id="ch-a" class="sel">登上祭台，仰望星空</button>
+      <button id="ch-b">走进坑中，触摸青铜</button>
+    </div>
+  </div>
+  <button class="btn" id="btn-divine">推 演</button>
+</section>
+
+<!-- S2 推演 -->
+<section class="scene" id="scene-divine">
+  <div class="kicker">推演中</div>
+  <div id="divine-glyphs">金</div>
+  <div id="divine-note">古蜀祭司正在为你占算</div>
+</section>
+
+<!-- S3 召唤 -->
+<section class="scene" id="scene-summon">
+  <div id="cam-wrap">
+    <video id="cam" autoplay playsinline muted></video>
+    <canvas id="overlay"></canvas>
+  </div>
+  <div id="summon-top">
+    <div id="summon-tip">学他的手印</div>
+    <div id="summon-sub">右手在上，左手在下，双手环握于胸前</div>
+  </div>
+  <div id="summon-bottom"></div>
+  <div id="fallback-zone"><div class="ring">长按此处<br>以指为印</div></div>
+  <div id="gate">
+    <div class="kicker">仪式之前</div>
+    <p class="privacy"><b>画面只在你的设备上流转。</b><br>召唤仪式需借用摄像头感应你的手势，<br>影像不上传、不存储、不离开此机。<br>仪式结束，即归尘土。</p>
+    <button class="btn" id="btn-gate-ok">同意，开启仪式</button>
+    <button class="btn minor" id="btn-gate-skip">不开摄像头，以指为印</button>
+  </div>
+</section>
+
+<!-- S4 揭晓 · 缘分卡 -->
+<section class="scene" id="scene-card">
+  <div class="kicker">缘 已 定</div>
+  <div id="seal-char">执</div>
+  <div id="artifact-stage"></div>
+  <div id="artifact-name">金杖</div>
+  <div id="artifact-elem">五行 · 金</div>
+  <div class="rare-tag" id="rare-tag">万中无一 · 隐藏缘签</div>
+  <p id="verdict"></p>
+  <p id="hypo"></p>
+  <img id="card-preview" alt="缘分卡预览">
+  <button class="btn" id="btn-save">留 存 此 缘</button>
+  <button class="btn minor" id="btn-again">再问一次</button>
+</section>
+
+<div id="toast"></div>
+<script src="./app.js"></script>
+</body>
+</html>

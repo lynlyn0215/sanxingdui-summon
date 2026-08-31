@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>手印判别自检</title>
+<style>
+ body{background:#0d0f0e;color:#e8e0cc;font:14px/1.9 ui-monospace,Menlo,monospace;padding:26px}
+ h1{font-size:15px;letter-spacing:.2em;color:#d9b25c;font-weight:400;margin-bottom:14px}
+ .ok{color:#7fd6a8}.bad{color:#c2604a}
+ #sum{margin-top:16px;padding-top:12px;border-top:1px solid #24463c;font-size:15px}
+</style>
+</head>
+<body>
+<h1>古蜀手印判别 · 自检</h1>
+<div id="out">running…</div>
+<div id="sum"></div>
+<script src="./mudra.js"></script>
+<script>
+/* 合成 21 关键点手部（canonical 指尖朝上），验证 classifyMudra 的几何规则。
+   调阈值后请重跑本页，必须全绿。 */
+const CANON = [[0,0],[-.18,-.12],[-.3,-.26],[-.38,-.38],[-.44,-.5],
+ [-.25,-.55],[-.28,-.8],[-.3,-.95],[-.31,-1.1],
+ [0,-.58],[0,-.85],[0,-1.0],[0,-1.18],
+ [.22,-.55],[.25,-.8],[.26,-.94],[.27,-1.08],
+ [.42,-.48],[.46,-.68],[.48,-.8],[.5,-.9]];
+const CURL_IDS = [6,7,8,10,11,12,14,15,16,18,19,20];
+function mkHand(cx, cy, s, curled, rot) {
+  rot = rot || 0;
+  return { landmarks: CANON.map((p, i) => {
+    let [x, y] = p;
+    if (curled && CURL_IDS.includes(i)) { const k = [8,12,16,20].includes(i) ? .42 : .72; x *= k; y *= k; }
+    const c = Math.cos(rot), sn = Math.sin(rot);
+    return { x: cx + (x*c - y*sn)*s, y: cy + (x*sn + y*c)*s, z: 0 };
+  }), handedness: 'Right' };
+}
+const H = (cx, cy, curl, rot) => mkHand(cx, cy, 0.16, curl, rot || 0);
+
+const CASES = [
+  ['环握 · 双拳上下相叠',      [H(.50,.52,true), H(.50,.66,true)],            'huanwo'],
+  ['平举 · 双掌左右张开',      [H(.14,.50,false,-1.2), H(.86,.50,false,1.2)], 'pingju'],
+  ['上托 · 双掌高举过头',      [H(.38,.28,false), H(.62,.28,false)],          'shangtuo'],
+  ['相向 · 双掌胸前相对',      [H(.42,.58,false), H(.62,.58,false)],          'xiangxiang'],
+  ['独持 · 单手握持',          [H(.50,.55,true)],                             'shuwo'],
+  ['负例 · 单手张开',          [H(.50,.55,false)],                            null],
+  ['负例 · 双拳左右分开',      [H(.25,.50,true), H(.75,.50,true)],            null],
+  ['负例 · 垂手张开',          [H(.35,.86,false), H(.65,.86,false)],          null],
+  ['负例 · 垂手张开且很宽',    [H(.12,.86,false), H(.88,.86,false)],          null],
+  ['负例 · 画面无手',          [],                                            null]
+];
+
+let pass = 0;
+const rows = CASES.map(([name, hands, expect]) => {
+  const r = classifyMudra(hands);
+  const got = r ? r.id : null;
+  const ok = got === expect;
+  if (ok) pass++;
+  return '<div class="' + (ok ? 'ok' : 'bad') + '">' + (ok ? '✓' : '✗') + ' ' + name +
+    '　期望 ' + (expect || 'null') + '　实得 ' + (got || 'null') + '</div>';
+});
+document.getElementById('out').innerHTML = rows.join('');
+document.getElementById('sum').innerHTML = pass === CASES.length
+  ? '<span class="ok">全部通过 ' + pass + '/' + CASES.length + '</span>'
+  : '<span class="bad">失败 ' + (CASES.length - pass) + ' 项（' + pass + '/' + CASES.length + '）</span>';
+</script>
+</body>
+</html>

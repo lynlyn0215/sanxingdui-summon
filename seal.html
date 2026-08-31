@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>结印 · 通神</title>
+<style>
+  :root{
+    --ink:#0d0f0e; --ink2:#151917;
+    --bronze:#3d7a68; --bronze-dim:#24463c;
+    --gold:#d9b25c; --gold-hi:#f0d48a;
+    --paper:#e8e0cc; --paper-dim:#9a917c;
+    --bad:#c2604a;
+    --safe-t:env(safe-area-inset-top,0px);
+    --safe-b:env(safe-area-inset-bottom,0px);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+  body{background:var(--ink);color:var(--paper);
+    font-family:'Songti SC','STSong','Noto Serif CJK SC','SimSun',serif;user-select:none;
+    -webkit-user-select:none;touch-action:manipulation}
+  .btn{padding:14px 40px;font-family:inherit;font-size:17px;letter-spacing:.28em;text-indent:.28em;
+    color:var(--gold-hi);background:transparent;border:1px solid var(--gold);border-radius:2px;cursor:pointer}
+  .btn:active{background:rgba(217,178,92,.14)}
+  .btn.minor{border-color:var(--bronze-dim);color:var(--paper-dim);font-size:13px;padding:10px 24px;letter-spacing:.22em}
+  .kicker{font-size:12px;letter-spacing:.5em;text-indent:.5em;color:var(--bronze)}
+
+  .screen{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
+    padding:calc(28px + var(--safe-t)) 26px calc(28px + var(--safe-b));text-align:center}
+  .screen.on{display:flex}
+
+  /* ---------- 开始页 ---------- */
+  #s-intro h1{font-size:40px;font-weight:400;letter-spacing:.2em;text-indent:.2em;color:var(--gold-hi);margin:14px 0 18px}
+  #s-intro p{font-size:15px;line-height:2;color:var(--paper-dim);max-width:22em}
+  #s-intro .mudra-preview{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:26px 0 8px;max-width:24em}
+  .mp-chip{font-size:12.5px;letter-spacing:.1em;color:var(--gold);border:1px solid rgba(217,178,92,.35);
+    padding:5px 11px;border-radius:2px}
+  #s-intro .btn{margin-top:30px}
+  #intro-note{margin-top:18px;font-size:11.5px;color:#5c6b60;letter-spacing:.06em;line-height:1.9}
+  #cam-pick{display:none;margin-top:16px;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center}
+  #cam-pick.on{display:flex}
+  #cam-select{font-family:inherit;font-size:13px;color:var(--paper);background:var(--ink2);
+    border:1px solid var(--bronze-dim);border-radius:2px;padding:8px 10px;max-width:66vw}
+  #intro-note.err{color:var(--bad);font-size:13px}
+  #intro-note.err b{color:var(--gold-hi);font-weight:400}
+
+  /* ---------- 加载 ---------- */
+  #s-load .bar{width:min(70vw,260px);height:2px;background:rgba(154,145,124,.25);margin-top:22px;overflow:hidden}
+  #s-load .bar i{display:block;height:100%;width:0;background:var(--gold);transition:width .35s ease}
+
+  /* ---------- 游戏 ---------- */
+  #s-play{padding:0;justify-content:flex-start}
+  #cam{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);
+    filter:saturate(.5) contrast(1.04) brightness(.62)}
+  #fx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  #hud{position:absolute;top:0;left:0;right:0;z-index:3;padding:calc(16px + var(--safe-t)) 18px 0;
+    display:flex;align-items:flex-start;justify-content:space-between;font-size:13px;letter-spacing:.1em}
+  #hud .val{color:var(--gold-hi);font-size:19px;letter-spacing:.04em}
+  #hud .lbl{color:var(--paper-dim);font-size:10.5px;letter-spacing:.3em}
+  #combo{color:var(--gold);font-size:15px;min-height:1.2em;letter-spacing:.12em}
+
+  #prompt{position:absolute;left:0;right:0;top:calc(84px + var(--safe-t));z-index:3;text-align:center;pointer-events:none}
+  #p-name{font-size:46px;letter-spacing:.24em;text-indent:.24em;color:var(--gold-hi);
+    text-shadow:0 2px 18px #000,0 0 40px rgba(217,178,92,.4);line-height:1.25}
+  #p-hint{margin-top:8px;font-size:14px;letter-spacing:.08em;color:var(--paper);text-shadow:0 1px 8px #000}
+  #p-src{margin-top:5px;font-size:11px;letter-spacing:.06em;color:var(--bronze)}
+  #timebar{position:absolute;left:12%;right:12%;top:calc(64px + var(--safe-t));height:2px;
+    background:rgba(154,145,124,.2);z-index:3}
+  #timebar i{display:block;height:100%;width:100%;background:var(--gold);transform-origin:left center}
+
+  #verdict{position:absolute;left:0;right:0;top:52%;transform:translateY(-50%);z-index:4;text-align:center;
+    font-size:60px;letter-spacing:.3em;text-indent:.3em;opacity:0;pointer-events:none;
+    text-shadow:0 0 40px currentColor}
+  #verdict.hit{color:var(--gold-hi);animation:pop .5s ease}
+  #verdict.miss{color:var(--bad);animation:pop .5s ease}
+  @keyframes pop{0%{opacity:0;transform:translateY(-50%) scale(.75)}
+    25%{opacity:1;transform:translateY(-50%) scale(1.06)}
+    70%{opacity:1;transform:translateY(-50%) scale(1)}
+    100%{opacity:0;transform:translateY(-50%) scale(1)}}
+
+  /* 识别中的手印回显 */
+  #live{position:absolute;left:0;right:0;bottom:calc(20px + var(--safe-b));z-index:3;text-align:center;
+    font-size:13px;letter-spacing:.18em;color:var(--paper-dim);min-height:1.4em}
+  #live b{font-weight:400;color:var(--gold)}
+  #nohand{color:#7b6f5a}
+
+  /* ---------- 结算 ---------- */
+  #s-end .score{font-size:64px;color:var(--gold-hi);letter-spacing:.06em;line-height:1.1}
+  #s-end .rows{margin:24px 0 6px;font-size:14px;line-height:2.3;color:var(--paper)}
+  #s-end .rows span{color:var(--paper-dim);margin-right:12px;letter-spacing:.2em}
+  #end-title{font-size:15px;letter-spacing:.36em;text-indent:.36em;color:var(--gold)}
+  #s-end .btn{margin-top:26px}
+  #s-end .btn.minor{margin-top:12px}
+
+  @media (max-height:680px){
+    #p-name{font-size:38px}
+    #verdict{font-size:48px}
+  }
+</style>
+</head>
+<body>
+
+<!-- 开始 -->
+<section class="screen on" id="s-intro">
+  <span class="kicker">通 神 · 第 二 关</span>
+  <h1>结 印</h1>
+  <p>三千年前，古蜀祭司以手势通神。<br>碎片沉在暗处，等一个正确的手印。</p>
+  <div class="mudra-preview" id="mp-list"></div>
+  <button class="btn" id="btn-start">开 启 摄 像 头</button>
+  <div id="cam-pick">
+    <select id="cam-select"></select>
+    <button class="btn minor" id="btn-redetect">重 新 检 测</button>
+  </div>
+  <div id="intro-note">画面只在本机处理，不上传、不存储<br>请让上半身与双手都进入画面</div>
+</section>
+
+<!-- 加载 -->
+<section class="screen" id="s-load">
+  <span class="kicker">正 在 唤 醒</span>
+  <div class="bar"><i id="load-bar"></i></div>
+</section>
+
+<!-- 游戏 -->
+<section class="screen" id="s-play">
+  <video id="cam" autoplay playsinline muted></video>
+  <canvas id="fx"></canvas>
+  <div id="hud">
+    <div><div class="lbl">得 分</div><div class="val" id="score">0</div></div>
+    <div id="combo"></div>
+    <div style="text-align:right"><div class="lbl">进 度</div><div class="val" id="progress">1/8</div></div>
+  </div>
+  <div id="timebar"><i id="timebar-i"></i></div>
+  <div id="prompt">
+    <div id="p-name">环 握</div>
+    <div id="p-hint"></div>
+    <div id="p-src"></div>
+  </div>
+  <div id="verdict"></div>
+  <div id="live"><span id="nohand">未见双手</span></div>
+</section>
+
+<!-- 结算 -->
+<section class="screen" id="s-end">
+  <div id="end-title"></div>
+  <div class="score" id="end-score">0</div>
+  <div class="rows" id="end-rows"></div>
+  <button class="btn" id="btn-again">再 试 一 次</button>
+  <button class="btn minor" id="btn-quit">退 出</button>
+</section>
+
+<script src="./mudra.js?v=1"></script>
+<script type="module" src="./seal.js?v=1"></script>
+</body>
+</html>

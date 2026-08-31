@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>跨坑复原 · 3D 拼合 Demo</title>
+<style>
+  :root{ --ink:#0d0f0e; --bronze:#3d7a68; --gold:#d9b25c; --gold-hi:#f0d48a; --paper:#e8e0cc; --paper-dim:#9a917c; }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden}
+  body{background:var(--ink);color:var(--paper);font-family:'Songti SC','STSong','Noto Serif CJK SC','SimSun',serif;user-select:none}
+  /* canvas 是 replaced 元素：inset:0 不会拉伸它，必须显式 100%（dpr>1 时缓冲区溢出视口的元凶） */
+  #stage{position:fixed;inset:0;display:block;touch-action:none;width:100%;height:100%}
+  .hud{position:fixed;left:0;right:0;text-align:center;pointer-events:none;z-index:3}
+  #hud-top{top:0;padding:44px 24px 60px;background:linear-gradient(rgba(13,15,14,.9),transparent)}
+  #hud-title{font-size:19px;letter-spacing:.22em;color:var(--gold-hi);text-shadow:0 1px 8px #000}
+  #hud-sub{margin-top:8px;font-size:13px;letter-spacing:.12em;color:var(--paper-dim)}
+  #hud-bottom{bottom:0;padding:52px 24px 40px;background:linear-gradient(transparent,rgba(13,15,14,.92))}
+  .minor-btn{pointer-events:auto;padding:9px 26px;font-family:inherit;font-size:13px;letter-spacing:.3em;text-indent:.3em;color:var(--paper-dim);background:rgba(13,15,14,.4);border:1px solid var(--bronze-dim,#24463c);border-radius:2px;cursor:pointer}
+  .minor-btn:active{background:rgba(217,178,92,.12)}
+  #stage{cursor:grab}
+  #loading{position:fixed;inset:0;z-index:9;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--ink);letter-spacing:.3em;color:var(--bronze);font-size:14px}
+  #loading .dot{margin-top:14px;color:var(--gold);font-size:12px;letter-spacing:.5em}
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+
+<div class="hud" id="hud-top">
+  <div id="hud-title">六坑之中 · 碎片沉睡</div>
+  <div id="hud-sub">拖动碎片，拼回它的位置</div>
+</div>
+<div class="hud" id="hud-bottom">
+  <button id="btn-auto" class="minor-btn">自 动 复 原</button>
+</div>
+
+<div id="loading">跨 坑 拼 对 装 载 中<div class="dot">· · ·</div></div>
+
+<script src="./lib/three-bundle.js"></script>
+<script src="./assets/mask-glb.js"></script>
+<script src="./3d-demo.js?v=3"></script>
+</body>
+</html>

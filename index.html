@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>掌中古蜀 · 三星堆</title>
+<style>
+  :root{
+    --ink:#0d0f0e; --ink2:#151917;
+    --bronze:#3d7a68; --bronze-dim:#24463c;
+    --gold:#d9b25c; --gold-hi:#f0d48a;
+    --paper:#e8e0cc; --paper-dim:#9a917c;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden}
+  body{background:var(--ink);color:var(--paper);font-family:'Songti SC','STSong','Noto Serif CJK SC','SimSun',serif;user-select:none}
+  .scene{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+  .scene.on{display:flex}
+  .kicker{font-size:13px;letter-spacing:.5em;text-indent:.5em;color:var(--bronze)}
+  .btn{padding:14px 46px;font-family:inherit;font-size:17px;letter-spacing:.3em;text-indent:.3em;color:var(--gold-hi);background:transparent;border:1px solid var(--gold);border-radius:2px;cursor:pointer}
+  .btn:active{background:rgba(217,178,92,.12)}
+  .btn.minor{border-color:var(--bronze-dim);color:var(--paper-dim);font-size:13px;padding:9px 26px;letter-spacing:.25em}
+  .hairline{width:54px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+
+  /* ---- S0 入场门 ---- */
+  #gate-line{font-size:19px;line-height:2.2;letter-spacing:.14em;color:var(--paper);max-width:22em}
+  #gate-enter{margin-top:52px}
+  #scene-gate .fade-in{animation:fadeUp 1.6s ease both}
+  #scene-gate .fade-in2{animation:fadeUp 1.6s .8s ease both}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+  /* ---- S1 序章：考古现场倒叙 ---- */
+  #scene-prologue{background:#000}
+  #pro-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 1.4s ease}
+  #pro-img.show{opacity:1}
+  #pro-card{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:0 34px;text-align:center;z-index:2}
+  #pro-card-text{font-size:22px;line-height:2.1;letter-spacing:.16em;color:var(--paper);opacity:0;transition:opacity 1s ease;max-width:20em}
+  #pro-card-text.show{opacity:1}
+  #pro-sub{position:absolute;left:24px;right:24px;bottom:13%;font-size:17px;letter-spacing:.1em;line-height:1.9;color:var(--paper);text-shadow:0 2px 10px #000,0 0 30px #000;z-index:3;opacity:0;transition:opacity .9s ease}
+  #pro-sub.show{opacity:1}
+  #pro-vignette{position:absolute;inset:0;z-index:1;background:radial-gradient(ellipse at center,transparent 35%,rgba(13,15,14,.55) 78%,rgba(13,15,14,.9) 100%)}
+  #btn-skip{position:absolute;top:40px;right:22px;z-index:3;padding:8px 18px;font-family:inherit;font-size:12px;letter-spacing:.25em;color:var(--paper-dim);background:rgba(13,15,14,.45);border:1px solid rgba(154,145,124,.4);border-radius:2px;cursor:pointer}
+  #title-reveal{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(13,15,14,.82);z-index:4}
+  #title-reveal.on{display:flex}
+  #title-reveal h1{font-size:52px;font-weight:400;letter-spacing:.22em;text-indent:.22em;color:var(--gold-hi);text-shadow:0 0 40px rgba(217,178,92,.45);animation:fadeUp 1.8s ease both}
+  #title-reveal .kicker{margin-bottom:20px;animation:fadeUp 1.2s ease both}
+
+  /* ---- S2 修复现场（restore.js 接管内部） ---- */
+  #scene-restore{padding:0}
+  #stage{position:absolute;inset:0;display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+  .hud{position:absolute;left:0;right:0;text-align:center;pointer-events:none;z-index:3}
+  #hud-top{top:0;padding:42px 24px 60px;background:linear-gradient(rgba(13,15,14,.9),transparent)}
+  #hud-title{font-size:19px;letter-spacing:.22em;color:var(--gold-hi);text-shadow:0 1px 8px #000}
+  #hud-sub{margin-top:8px;font-size:13px;letter-spacing:.12em;color:var(--paper-dim)}
+  #hud-bottom{bottom:0;padding:52px 24px 38px;background:linear-gradient(transparent,rgba(13,15,14,.92))}
+  #btn-auto{pointer-events:auto}
+  /* 复原完成后的揭示面板：底部升起，3D 面具在其上方继续自转 */
+  #reveal-panel{position:absolute;left:0;right:0;bottom:0;z-index:4;padding:34px 30px 40px;text-align:center;
+    background:linear-gradient(transparent,rgba(13,15,14,.9) 16%,var(--ink) 46%);
+    opacity:0;transform:translateY(26px);transition:opacity 1.1s ease,transform 1.1s ease;pointer-events:none}
+  #reveal-panel.on{opacity:1;transform:none;pointer-events:auto}
+  #reveal-panel .kicker{display:block;margin-bottom:18px}
+  .rv-lead{font-size:16px;letter-spacing:.1em;color:var(--paper);margin-bottom:20px}
+  .rv-rows{display:inline-block;text-align:left;margin-bottom:20px}
+  .rv-row{display:flex;align-items:baseline;gap:14px;font-size:14px;line-height:2.1;color:var(--paper-dim)}
+  .rv-row b{font-weight:400;color:var(--gold);letter-spacing:.06em;min-width:3.4em}
+  .rv-row span{color:var(--bronze);min-width:4.2em}
+  .rv-row i{font-style:normal;color:var(--paper)}
+  .rv-text{font-size:14.5px;line-height:2;color:var(--paper);margin-bottom:14px}
+  .rv-text b{font-weight:400;color:var(--gold-hi)}
+  .rv-text.dim{color:var(--paper-dim);font-size:13.5px}
+  .rv-punch{font-size:17px;letter-spacing:.1em;color:var(--gold-hi);margin:22px 0 30px}
+  #btn-continue{pointer-events:auto}
+  #loading{position:absolute;inset:0;z-index:9;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--ink);letter-spacing:.3em;color:var(--bronze);font-size:14px}
+  #loading .dot{margin-top:14px;color:var(--gold);font-size:12px;letter-spacing:.5em}
+  #pit-labels{position:absolute;inset:0;pointer-events:none;z-index:2}
+  .pit-label{position:absolute;left:0;top:0;font-size:11.5px;letter-spacing:.22em;color:var(--gold);white-space:nowrap;opacity:0;transition:opacity .5s;text-shadow:0 1px 6px #000}
+
+  /* ---- S3 假说剧场 ---- */
+  #scene-theater{background:var(--ink)}
+  #th-bg{position:absolute;inset:0}
+  #th-bg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.42;filter:saturate(.85)}
+  #th-veil{position:absolute;inset:0;background:linear-gradient(rgba(13,15,14,.72) 0%,rgba(13,15,14,.28) 40%,rgba(13,15,14,.86) 78%,var(--ink) 100%)}
+  #th-content{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;padding:0 30px 46px}
+  #th-head{position:absolute;top:0;left:0;right:0;padding:44px 24px 0;text-align:center}
+  #th-head .kicker{display:block;margin-bottom:10px}
+  #th-question{font-size:21px;letter-spacing:.16em;color:var(--paper)}
+  #th-tag{font-size:13px;letter-spacing:.4em;text-indent:.4em;color:var(--gold);border:1px solid rgba(217,178,92,.5);padding:6px 14px;margin-bottom:16px}
+  #th-name{font-size:30px;letter-spacing:.2em;color:var(--gold-hi);margin-bottom:14px}
+  #th-desc{font-size:14.5px;line-height:2;color:var(--paper);max-width:30em;text-align:left;margin-bottom:26px}
+  #th-nav{display:flex;align-items:center;gap:22px;margin-bottom:20px}
+  .th-arrow{pointer-events:auto;width:44px;height:44px;font-size:18px;color:var(--gold);background:rgba(13,15,14,.5);border:1px solid rgba(217,178,92,.4);border-radius:50%;cursor:pointer;font-family:inherit}
+  #th-dots{display:flex;gap:10px}
+  .th-dot{width:7px;height:7px;border-radius:50%;background:rgba(154,145,124,.35)}
+  .th-dot.on{background:var(--gold-hi)}
+  #btn-believe{min-width:230px}
+
+  /* ---- S4 结语 ---- */
+  #scene-epilogue{padding:40px 30px}
+  #ep-frame{max-width:34em;border:1px solid rgba(217,178,92,.5);padding:52px 34px;position:relative}
+  #ep-frame::after{content:'';position:absolute;inset:8px;border:1px solid rgba(61,122,104,.35);pointer-events:none}
+  #ep-choice{font-size:13px;letter-spacing:.4em;text-indent:.4em;color:var(--bronze);margin-bottom:26px}
+  #ep-verdict{font-size:18px;line-height:2.3;letter-spacing:.08em;color:var(--paper);margin-bottom:30px}
+  #ep-coda{font-size:14px;line-height:2.2;color:var(--paper-dim);margin-bottom:8px}
+  #ep-sign{font-size:15px;letter-spacing:.5em;text-indent:.5em;color:var(--gold-hi);margin-top:22px}
+  #ep-again{margin-top:44px}
+</style>
+</head>
+<body>
+
+<!-- S0 入场门 -->
+<section class="scene on" id="scene-gate">
+  <p id="gate-line" class="fade-in">三千年前的一夜，<br>他们亲手埋葬了自己的神。</p>
+  <button class="btn fade-in2" id="gate-enter">入 夜</button>
+</section>
+
+<!-- S1 序章 -->
+<section class="scene" id="scene-prologue">
+  <img id="pro-img" src="" alt="">
+  <div id="pro-vignette"></div>
+  <div id="pro-card"><div id="pro-card-text"></div></div>
+  <div id="pro-sub"></div>
+  <button id="btn-skip">跳 过</button>
+  <div id="title-reveal">
+    <span class="kicker">三 星 堆</span>
+    <h1>掌中古蜀</h1>
+  </div>
+</section>
+
+<!-- S2 修复现场 -->
+<section class="scene" id="scene-restore">
+  <canvas id="stage"></canvas>
+  <div class="hud" id="hud-top">
+    <div id="hud-title">六坑之中 · 碎片沉睡</div>
+    <div id="hud-sub">拖动碎片，拼回它的位置</div>
+  </div>
+  <div class="hud" id="hud-bottom">
+    <button id="btn-auto" class="btn minor">自 动 复 原</button>
+  </div>
+  <div id="reveal-panel">
+    <span class="kicker">研 究 性 复 原</span>
+    <p class="rv-lead">你刚才做的事，考古学家真的做过。</p>
+    <div class="rv-rows">
+      <div class="rv-row"><b>1986</b><span>二号坑</span><i>铜鸟足人像</i></div>
+      <div class="rv-row"><b>2021</b><span>三号坑</span><i>爬龙铜器盖</i></div>
+      <div class="rv-row"><b>2022</b><span>八号坑</span><i>曲身顶尊人像</i></div>
+    </div>
+    <p class="rv-text">分离三千年，跨越三十六年考古，<br>它们拼成同一件：<b>鸟足曲身顶尊神像</b>。</p>
+    <p class="rv-text dim">实体因结构安全无法真正合体——<br>博物馆里那一尊，是三维扫描与 3D 打印的复原件。</p>
+    <p class="rv-punch">连它完整的样子，也只是一种推测。</p>
+    <button id="btn-continue" class="btn">那一夜，究竟发生了什么 ▸</button>
+  </div>
+  <div id="loading">跨 坑 拼 对 装 载 中<div class="dot">· · ·</div></div>
+</section>
+
+<!-- S3 假说剧场 -->
+<section class="scene" id="scene-theater">
+  <div id="th-bg"><img id="th-img" src="" alt=""></div>
+  <div id="th-veil"></div>
+  <div id="th-head">
+    <span class="kicker">四 种 假 说 · 至 今 无 解</span>
+    <div id="th-question">你相信那一夜发生了什么？</div>
+  </div>
+  <div id="th-content">
+    <div id="th-tag"></div>
+    <div id="th-name"></div>
+    <p id="th-desc"></p>
+    <div id="th-nav">
+      <button class="th-arrow" id="th-prev">‹</button>
+      <div id="th-dots"></div>
+      <button class="th-arrow" id="th-next">›</button>
+    </div>
+    <button class="btn" id="btn-believe">我 相 信 这 一 夜</button>
+  </div>
+</section>
+
+<!-- S4 结语 -->
+<section class="scene" id="scene-epilogue">
+  <div id="ep-frame">
+    <div id="ep-choice"></div>
+    <p id="ep-verdict"></p>
+    <p id="ep-coda">六座坑之外，仍有遗迹尚未发掘。<br>真相仍在土里。</p>
+    <div class="hairline" style="margin:26px auto 0"></div>
+    <div id="ep-sign">掌 中 古 蜀</div>
+  </div>
+  <button class="btn minor" id="ep-again">再 经 历 一 次</button>
+</section>
+
+<script src="./lib/three-bundle.js"></script>
+<script src="./assets/mask-glb.js"></script>
+<script src="./restore.js?v=1"></script>
+<script src="./main.js?v=1"></script>
+</body>
+</html>
