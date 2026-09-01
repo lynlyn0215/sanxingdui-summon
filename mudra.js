@@ -4,22 +4,28 @@
    四个手印全部有出土文物为证，见 MUDRAS[].source */
 'use strict';
 
+/* zones：屏幕上的虚线手位提示（归一化坐标，与下方判别阈值保持一致）
+   fist=true 画拳形，false 画掌形；用户把手放进虚线圈即可 */
 const MUDRAS = [
   {
     id: 'huanwo', name: '环握', hint: '双拳虚握，上下相叠于胸前',
-    source: '青铜大立人 · 金沙小铜立人'
+    source: '青铜大立人 · 金沙小铜立人',
+    zones: [{ x: .50, y: .45, fist: true }, { x: .50, y: .63, fist: true }]
   },
   {
     id: 'xiangxiang', name: '相向', hint: '双掌立起相对，掌间留一道缝',
-    source: '扭头跪坐人像（掌间原嵌有物）'
+    source: '扭头跪坐人像（掌间原嵌有物）',
+    zones: [{ x: .39, y: .55, fist: false }, { x: .61, y: .55, fist: false }]
   },
   {
     id: 'dingzun', name: '顶尊', hint: '双手抬到头两侧，像托住头顶的器物',
-    source: '铜顶尊跪坐人像'
+    source: '铜顶尊跪坐人像',
+    zones: [{ x: .28, y: .30, fist: false }, { x: .72, y: .30, fist: false }]
   },
   {
     id: 'shuwo', name: '独持', hint: '只用一只手，握成持物的样子',
-    source: '铜持龙立人像 · 铜持鸟立人像'
+    source: '铜持龙立人像 · 铜持鸟立人像',
+    zones: [{ x: .50, y: .55, fist: true }]
   }
 ];
 

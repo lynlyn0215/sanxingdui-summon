@@ -106,16 +106,36 @@ function syncPlanes(sh) {
   }
 }
 
-/* 第 i 块碎片飞回并嵌入 */
-function landShard(i) {
+/* 第 i 块碎片飞回并嵌入。ghost=true 表示"研究性复原"——
+   玩家没结出来的部分，以半透明金色推测形态补上（真实文物复原件正是如此） */
+function landShard(i, ghost) {
   if (!ready || i >= shards.length) return;
   const sh = shards[i];
   if (sh.state !== 'hidden') return;
+  sh.ghost = !!ghost;
   sh.state = 'flying';
   sh.tStart = performance.now();
   sh.wrap.visible = true;
   sh.wrap.position.copy(sh.from);
   sh.wrap.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+  if (ghost) {
+    sh.mesh.material.color = new THREE.Color(0xd9b25c);
+    sh.mesh.material.emissive = new THREE.Color(0x8a6a28);
+  }
+}
+
+/* 把所有未归位的碎片以"推测"形态补齐，返回补了几块 */
+function fillMissing() {
+  if (!ready) return 0;
+  let n = 0, delay = 0;
+  shards.forEach((sh, i) => {
+    if (sh.state === 'hidden') {
+      setTimeout(() => landShard(i, true), delay);
+      delay += 220;
+      n++;
+    }
+  });
+  return n;
 }
 
 function complete() {
@@ -162,15 +182,18 @@ function tick(now) {
         sh.wrap.rotation.set(sh.wrap.rotation.x * (1 - e * 0.22),
           sh.wrap.rotation.y * (1 - e * 0.22), sh.wrap.rotation.z * (1 - e * 0.22));
         sh.mesh.material.opacity = e;
+        if (sh.ghost) sh.mesh.material.opacity = e * 0.42; /* 推测部分保持半透明 */
         if (k >= 1) {
           sh.state = 'locked';
           sh.wrap.position.set(0, 0, 0);
           sh.wrap.rotation.set(0, 0, 0);
-          sh.mesh.material.opacity = 1;
-          sh.mesh.material.emissive = new THREE.Color(0xd9b25c);
-          sh.mesh.material.emissiveIntensity = 1.6;
-          sh.pulseT0 = now;
-          addBurst(new THREE.Vector3(0, 0, 0), 60, 0.02);
+          sh.mesh.material.opacity = sh.ghost ? 0.42 : 1;
+          if (!sh.ghost) {
+            sh.mesh.material.emissive = new THREE.Color(0xd9b25c);
+            sh.mesh.material.emissiveIntensity = 1.6;
+            sh.pulseT0 = now;
+          }
+          addBurst(new THREE.Vector3(0, 0, 0), sh.ghost ? 24 : 60, 0.02);
         }
         syncPlanes(sh);
       } else if (sh.state === 'locked') {
@@ -212,7 +235,7 @@ function tick(now) {
 }
 
 return {
-  init, landShard, complete,
+  init, landShard, fillMissing, complete,
   get ready() { return ready; },
   get shardCount() { return SHARD_N; }
 };

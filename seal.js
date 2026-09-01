@@ -239,7 +239,10 @@ function onHit() {
   state.score += Math.round((100 + speed) * (1 + (state.combo - 1) * 0.25));
   $('combo').textContent = state.combo >= 2 ? state.combo + ' 连' : '';
   sHit(state.combo);
-  if (navigator.vibrate) navigator.vibrate(30);
+  /* 整屏金光一闪 + 轻微震屏 + 手机震动：结成的即时反馈 */
+  const fl = $('flash'); fl.classList.remove('go'); void fl.offsetWidth; fl.classList.add('go');
+  const sp = $('s-play'); sp.classList.remove('shake'); void sp.offsetWidth; sp.classList.add('shake');
+  if (navigator.vibrate) navigator.vibrate([28, 26, 55]);
   burst();
   /* 奖励画面：一块碎片从黑暗中飞回、嵌进面具（取代分数弹窗） */
   Summon.landShard(state.hits - 1);
@@ -269,18 +272,26 @@ function endGame() {
   $('live').style.display = 'none';
   $('hud').style.display = 'none';
 
-  if (allDone) Summon.complete();
-  sEnd();
-  if (navigator.vibrate) navigator.vibrate([60, 40, 140]);
+  /* 无论结成几印，面具都要复原、都要有画面：
+     没结出来的部分以半透明"推测形态"补上 —— 这正是博物馆研究性复原的做法 */
+  const missing = allDone ? 0 : Summon.fillMissing();
+  const fillMs = missing * 220 + 900;
 
-  /* 面具悬浮旋转几秒，再浮出一行字 */
   setTimeout(() => {
-    $('finale-title').textContent = allDone ? '纵目面具 · 已醒' : '它还缺 ' + (ROUNDS - state.hits) + ' 块';
-    $('finale-sub').textContent = allDone
-      ? '三千年前它被打碎掩埋，此刻在你掌中重聚'
-      : '再结一次印，把余下的碎片唤回来';
+    Summon.complete();
+    sEnd();
+    if (navigator.vibrate) navigator.vibrate([60, 40, 140]);
+    const fl = $('flash'); fl.classList.remove('go'); void fl.offsetWidth; fl.classList.add('go');
+  }, allDone ? 0 : fillMs);
+
+  setTimeout(() => {
+    $('finale-title').textContent = allDone ? '纵目面具 · 完整复原' : '纵目面具 · 研究性复原';
+    $('finale-sub').innerHTML = allDone
+      ? '八印俱全，三千年前被打碎掩埋的它，此刻在你掌中重聚'
+      : '你唤回了 ' + state.hits + ' 块，其余 ' + missing + ' 块由推测补全<br>' +
+        '<span style="color:#5c6b60">——博物馆里的复原件，也是这样做成的</span>';
     $('finale').classList.add('on');
-  }, allDone ? 2600 : 1200);
+  }, (allDone ? 0 : fillMs) + 2600);
 }
 
 /* 摄像头一直开着，重开一局直接重载页面重置 3D 场景（最省事、也不会残留状态） */
@@ -304,6 +315,65 @@ function burst() {
     const a = Math.random() * Math.PI * 2, v = 2 + Math.random() * 5;
     parts.push({ x: w / 2, y: h * 0.52, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1 });
   }
+}
+
+/* 虚线手位提示：告诉用户手该摆在哪、是拳还是掌
+   画面是镜像的，而手位提示左右基本对称，故直接用屏幕坐标 */
+function drawZones(target, hands, now) {
+  if (!target || !target.zones) return;
+  const w = window.innerWidth, h = window.innerHeight;
+  const R = Math.min(w, h) * 0.098;
+
+  /* 手的屏幕坐标（landmarks 未镜像 → x 需翻转） */
+  const handPts = hands.map(hd => {
+    const lm = hd.landmarks;
+    let cx = 0, cy = 0;
+    lm.forEach(p => { cx += p.x; cy += p.y; });
+    return { x: (1 - cx / lm.length) * w, y: (cy / lm.length) * h };
+  });
+
+  target.zones.forEach(z => {
+    const zx = z.x * w, zy = z.y * h;
+    const near = handPts.some(p => Math.hypot(p.x - zx, p.y - zy) < R * 1.55);
+    const pulse = 0.5 + 0.5 * Math.sin(now * 0.004);
+
+    fctx.save();
+    fctx.strokeStyle = near ? 'rgba(240,212,138,.95)' : 'rgba(217,178,92,' + (0.34 + pulse * 0.2) + ')';
+    fctx.lineWidth = near ? 3 : 2;
+    fctx.setLineDash(near ? [] : [9, 9]);
+    fctx.shadowColor = 'rgba(217,178,92,.85)';
+    fctx.shadowBlur = near ? 22 : 8;
+    fctx.beginPath(); fctx.arc(zx, zy, R, 0, Math.PI * 2); fctx.stroke();
+
+    /* 圈内画手形符号：拳=实心小圆+横线，掌=五指线 */
+    fctx.setLineDash([]);
+    fctx.lineWidth = 2;
+    fctx.strokeStyle = near ? 'rgba(240,212,138,.9)' : 'rgba(217,178,92,.5)';
+    if (z.fist) {
+      fctx.beginPath(); fctx.arc(zx, zy + R * .1, R * .42, 0, Math.PI * 2); fctx.stroke();
+      for (let i = -1; i <= 1; i++) {
+        fctx.beginPath();
+        fctx.moveTo(zx - R * .3, zy + R * .1 + i * R * .17);
+        fctx.lineTo(zx + R * .3, zy + R * .1 + i * R * .17);
+        fctx.stroke();
+      }
+    } else {
+      fctx.beginPath();
+      fctx.moveTo(zx - R * .3, zy + R * .45);
+      fctx.lineTo(zx - R * .3, zy + R * .02);
+      fctx.lineTo(zx + R * .3, zy + R * .02);
+      fctx.lineTo(zx + R * .3, zy + R * .45);
+      fctx.stroke();
+      for (let i = 0; i < 4; i++) {
+        const fx2 = zx - R * .27 + i * R * .18;
+        fctx.beginPath();
+        fctx.moveTo(fx2, zy + R * .02);
+        fctx.lineTo(fx2, zy - R * .5);
+        fctx.stroke();
+      }
+    }
+    fctx.restore();
+  });
 }
 
 /* 手部关键点描绘：确认"机器看见你了" */
@@ -367,6 +437,7 @@ function loop(now) {
       }
     } catch (e) { /* 掉帧忽略 */ }
   }
+  if (!state.locked) drawZones(state.target, hands, now);
   if (hands.length) drawHands(hands);
 
   /* 计时条 */
@@ -396,5 +467,5 @@ function loop(now) {
   }
 }
 
-/* 调试入口：控制台可查看当前特征 */
-window.__seal = { state, handFeatures, classifyMudra };
+/* 调试入口：控制台可查看当前特征、单独预览手位提示 */
+window.__seal = { state, handFeatures, classifyMudra, drawZones, fitCanvas, fctx };
