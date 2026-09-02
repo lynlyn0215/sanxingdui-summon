@@ -1,6 +1,6 @@
 # 交接 —— 掌中古蜀 · 三星堆
 
-> 刷新时间：2026-09-02 · 由 /sync 生成。下个会话从这里接手，先读本文，再读 `research.md`。
+> 刷新时间：2026-09-02（晚间，补齐假说动图后）。下个会话从这里接手，先读本文，再读 `research.md`。
 
 ## 0. 三十秒版
 
@@ -22,7 +22,7 @@
 | `lib/three-bundle.js` | Three.js r160 + GLTFLoader + OrbitControls 的单文件打包（esbuild） | — |
 | `lib/mediapipe/` | tasks-vision 0.10.14 + wasm + `hand_landmarker.task`（7.5MB），本地 vendored 不依赖 CDN | — |
 | `assets/mask-glb.js` | 纵目面具 3D 模型（Meshy 生成，2 万面）base64 内嵌，6.8MB | 未压缩 |
-| `assets/hypothesis/` | 四假说背景图/动图、「失火之夜」18 秒带声成片 mp4 | — |
+| `assets/hypothesis/` | 四假说动图（全部 Kling 2.6 图生视频 → 560px/12fps animated webp，人物不动只动烟/星/光）、「失火之夜」18 秒带声成片 mp4 | 2026-09-02 三张静态图已换成动图，失灵说底图重画 |
 | `assets/prologue/` | 序章四张考古现场图（webp） | — |
 | `research.md` | **考据底稿**：事实清单 / 假说对照 / 跨坑拼对实证 / 文案审核红线 / 来源链接 | 文案必须对照它 |
 | `gesture-demo.html` `gesture-app.js` `3d-demo.html` `3d-demo.js` | 早期 demo（缘分卡版、独立 3D 拼合版），仅存档 | 可删 |
@@ -53,6 +53,8 @@
 - 视频用作网页序章需 `-movflags +faststart`，且 python http.server 不支持 Range；现序章已改为图片，不再有此问题。
 - Kling 2.6 图生视频对"statue never moves"类 prompt 响应好；ffmpeg 转 animated webp（560px/12fps/q58）≈ 1MB/5s。
 - Lyn 的 Mac mini 没有摄像头，摄像头功能一律让 Lyn 用手机开线上地址测。
+- AI 画三星堆场景的考据穿帮清单（都实际出现过，prompt 里要显式禁掉）：明清飞檐楼阁、青铜剑/兵器（三星堆基本不见兵器）、金条、线香、圆形金币；拓片/写实底图做图生视频时 Kling 会幻觉出真火，剪影纹样风底图则老实。旧的失灵说拓片底图就是因楼阁穿帮被换掉的。
+- 生成流程：Higgsfield MCP（`balance` 查额度）→ `media_upload` 拿预签名 URL 用 curl PUT → `media_confirm` → `generate_video_batch`（kling2_6，9:16，5s，sound false，遇到 preset 推荐要带 `declined_preset_id` 重发）→ `jobs_wait` → ffmpeg `fps=12,scale=560:-2 -loop 0 -q:v 58` 转 webp。
 
 ## 5. 下一步（按优先级，等 Lyn 实测反馈后调整）
 
@@ -60,7 +62,7 @@
 2. **结印的另外两关**（设计已定，未做）：第一关「拂土」（手部位置擦开夯土层，帧差/手位即可）；第三关「纵目」（FaceLandmarker blendshapes：瞪眼不眨，眼睛越凸越久）。分关加载，**HandLandmarker 与 FaceLandmarker 绝不同时跑**。
 3. **器物匹配（非玄学版）**：按三关打法风格匹配 20 件器物（清单与判词草案在会话记忆和 research.md「奇怪的组合」段；金杖=一锤定音、铜神坛=零失误、龟背形网格状器=慢而不错、猪鼻龙=乱来但通关、虚握=中途放弃），每件配真实故事卡 + 实地验证清单（到馆钩子）。
 4. 主流程与结印的关系待定：结印可能取代主流程里的"3D 拖拽复原"环节，主流程保留序章 + 假说剧场 + 结语。
-5. 另外三个假说的专属动图（现为静态图）；换修复对象为鸟足神像（讨论过未定）。
+5. 换修复对象为鸟足神像（讨论过未定）。（另外三个假说的动图已于 2026-09-02 补齐）
 6. 资产瘦身：`mask-glb.js` 6.8MB 可用 gltf-transform 压到 ~2MB；删早期 demo 文件。
 7. ⏰ **AI 生成 credits 2026-09-03 清零**——若要再生素材务必在此之前。
 
