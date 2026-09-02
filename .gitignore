@@ -1,3 +1,5 @@
 .devcert.pem
 .DS_Store
 node_modules/
+# 小红书内部 brief，含对接信息，仅本地参考，不入公开仓库
+docs/*Brief*.pdf
