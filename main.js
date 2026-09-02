@@ -96,8 +96,12 @@ function endPrologue() {
   $('pro-sub').classList.remove('show');
   $('pro-card-text').classList.remove('show');
   $('title-reveal').classList.add('on');
-  setTimeout(() => { show('scene-restore'); startRestore(); }, 2400);
+  setTimeout(() => { show('scene-summon'); }, 2400);
 }
+
+/* ================= S1.5 结印入口 ================= */
+$('btn-seal').addEventListener('click', () => { location.href = './seal.html?from=main'; });
+$('btn-drag').addEventListener('click', () => { show('scene-restore'); startRestore(); });
 
 /* ================= S2 修复现场 ================= */
 let restoreStarted = false;
@@ -149,3 +153,9 @@ $('btn-believe').addEventListener('click', () => {
   show('scene-epilogue');
 });
 $('ep-again').addEventListener('click', () => location.reload());
+
+/* 从结印页回来（seal.html → index.html#theater）：跳过入场与序章，直达假说剧场 */
+if (location.hash === '#theater') {
+  history.replaceState(null, '', location.pathname);
+  show('scene-theater'); renderHypo(0);
+}

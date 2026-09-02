@@ -30,13 +30,17 @@
   .screen.on{display:flex}
 
   /* ---------- 开始页 ---------- */
-  #s-intro h1{font-size:40px;font-weight:400;letter-spacing:.2em;text-indent:.2em;color:var(--gold-hi);margin:14px 0 18px}
-  #s-intro p{font-size:15px;line-height:2;color:var(--paper-dim);max-width:22em}
-  #s-intro .mudra-preview{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:26px 0 8px;max-width:24em}
-  .mp-chip{font-size:12.5px;letter-spacing:.1em;color:var(--gold);border:1px solid rgba(217,178,92,.35);
-    padding:5px 11px;border-radius:2px}
-  #s-intro .btn{margin-top:30px}
-  #intro-note{margin-top:18px;font-size:11.5px;color:#5c6b60;letter-spacing:.06em;line-height:1.9}
+  #s-intro h1{font-size:40px;font-weight:400;letter-spacing:.2em;text-indent:.2em;color:var(--gold-hi);margin:14px 0 14px}
+  #s-intro p{font-size:14.5px;line-height:1.95;color:var(--paper-dim);max-width:22em}
+  #rite-list{display:flex;flex-direction:column;gap:8px;margin:22px 0 4px;width:min(84vw,340px)}
+  .rite-chip{font-family:inherit;text-align:left;background:transparent;border:1px solid rgba(217,178,92,.28);
+    border-radius:2px;padding:9px 14px;color:var(--paper-dim);cursor:pointer;display:flex;flex-direction:column;gap:3px}
+  .rite-chip b{font-weight:400;font-size:15px;letter-spacing:.12em;color:var(--gold)}
+  .rite-chip i{font-style:normal;font-size:11px;letter-spacing:.06em;color:var(--paper-dim)}
+  .rite-chip.on{border-color:var(--gold-hi);background:rgba(217,178,92,.1)}
+  .rite-chip.on b{color:var(--gold-hi)}
+  #s-intro .btn{margin-top:24px}
+  #intro-note{margin-top:16px;font-size:11.5px;color:#5c6b60;letter-spacing:.06em;line-height:1.9}
   #cam-pick{display:none;margin-top:16px;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center}
   #cam-pick.on{display:flex}
   #cam-select{font-family:inherit;font-size:13px;color:var(--paper);background:var(--ink2);
@@ -54,7 +58,6 @@
     filter:saturate(.5) contrast(1.04) brightness(.62)}
   #scene3d{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
   #fx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
-  /* 结印成功：整屏金光一闪 */
   #flash{position:absolute;inset:0;z-index:4;pointer-events:none;opacity:0;
     background:radial-gradient(circle at 50% 52%,rgba(255,240,200,.92) 0%,rgba(240,212,138,.55) 26%,rgba(217,178,92,.12) 58%,transparent 76%)}
   #flash.go{animation:goldflash .62s ease-out}
@@ -63,56 +66,54 @@
   @keyframes shake{0%,100%{transform:translate(0,0)}
     22%{transform:translate(-6px,3px)}48%{transform:translate(5px,-4px)}74%{transform:translate(-3px,2px)}}
   #finale{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;
-    justify-content:flex-end;padding:0 26px calc(52px + var(--safe-b));text-align:center;
+    justify-content:flex-end;padding:0 26px calc(48px + var(--safe-b));text-align:center;
     background:linear-gradient(transparent 46%,rgba(13,15,14,.72) 78%,rgba(13,15,14,.95));
     opacity:0;pointer-events:none;transition:opacity 1.2s ease}
   #finale.on{opacity:1;pointer-events:auto}
-  #finale-title{font-size:30px;letter-spacing:.24em;text-indent:.24em;color:var(--gold-hi);
+  #finale-title{font-size:26px;letter-spacing:.2em;text-indent:.2em;color:var(--gold-hi);
     text-shadow:0 0 34px rgba(217,178,92,.5)}
-  #finale-sub{margin-top:12px;font-size:14px;line-height:1.9;color:var(--paper-dim);letter-spacing:.06em}
-  #finale-btns{margin-top:30px;display:flex;flex-direction:column;gap:12px;align-items:center}
-  #hud{position:absolute;top:0;left:0;right:0;z-index:3;padding:calc(16px + var(--safe-t)) 18px 0;
-    display:flex;align-items:flex-start;justify-content:space-between;font-size:13px;letter-spacing:.1em}
-  #hud .val{color:var(--gold-hi);font-size:19px;letter-spacing:.04em}
-  #hud .lbl{color:var(--paper-dim);font-size:10.5px;letter-spacing:.3em}
-  #combo{color:var(--gold);font-size:15px;min-height:1.2em;letter-spacing:.12em}
+  #finale-sub{margin-top:12px;font-size:13.5px;line-height:1.9;color:var(--paper-dim);letter-spacing:.04em;max-width:26em}
+  #finale-sub b{font-weight:400;color:var(--gold)}
+  #finale-sub .dim{color:#5c6b60;font-size:12px}
+  #finale-btns{margin-top:26px;display:flex;flex-direction:column;gap:12px;align-items:center}
 
-  #prompt{position:absolute;left:0;right:0;top:calc(84px + var(--safe-t));z-index:3;text-align:center;pointer-events:none}
-  #p-name{font-size:46px;letter-spacing:.24em;text-indent:.24em;color:var(--gold-hi);
+  /* 咒式条：火影式横排，结过的亮起 */
+  #hud{position:absolute;top:0;left:0;right:0;z-index:3;padding:calc(14px + var(--safe-t)) 14px 0;text-align:center}
+  #rite-name{font-size:11px;letter-spacing:.4em;text-indent:.4em;color:var(--bronze)}
+  #rite-bar{display:flex;justify-content:center;gap:6px;margin-top:8px}
+  .rb{font-size:12px;letter-spacing:.14em;padding:5px 9px;border:1px solid rgba(154,145,124,.3);border-radius:2px;
+    color:rgba(154,145,124,.7);background:rgba(13,15,14,.35);transition:all .3s}
+  .rb.seal{border-style:double;border-width:3px;padding:3px 9px}
+  .rb.cur{border-color:var(--gold-hi);color:var(--gold-hi);box-shadow:0 0 14px rgba(217,178,92,.5)}
+  .rb.done{border-color:var(--gold);color:var(--ink);background:var(--gold)}
+
+  #prompt{position:absolute;left:0;right:0;top:calc(96px + var(--safe-t));z-index:3;text-align:center;pointer-events:none}
+  #p-name{font-size:42px;letter-spacing:.2em;text-indent:.2em;color:var(--gold-hi);
     text-shadow:0 2px 18px #000,0 0 40px rgba(217,178,92,.4);line-height:1.25}
   #p-hint{margin-top:8px;font-size:14px;letter-spacing:.08em;color:var(--paper);text-shadow:0 1px 8px #000}
   #p-src{margin-top:5px;font-size:11px;letter-spacing:.06em;color:var(--bronze)}
-  #timebar{position:absolute;left:12%;right:12%;top:calc(64px + var(--safe-t));height:2px;
-    background:rgba(154,145,124,.2);z-index:3}
-  #timebar i{display:block;height:100%;width:100%;background:var(--gold);transform-origin:left center}
 
   #verdict{position:absolute;left:0;right:0;top:52%;transform:translateY(-50%);z-index:4;text-align:center;
-    font-size:60px;letter-spacing:.3em;text-indent:.3em;opacity:0;pointer-events:none;
+    font-size:64px;letter-spacing:.3em;text-indent:.3em;opacity:0;pointer-events:none;
     text-shadow:0 0 40px currentColor}
-  #verdict.hit{color:var(--gold-hi);animation:pop .5s ease}
-  #verdict.miss{color:var(--bad);animation:pop .5s ease}
-  @keyframes pop{0%{opacity:0;transform:translateY(-50%) scale(.75)}
-    25%{opacity:1;transform:translateY(-50%) scale(1.06)}
+  #verdict.hit{color:var(--gold-hi);animation:pop .7s ease}
+  #verdict.ghost{color:var(--paper-dim);animation:pop .7s ease}
+  @keyframes pop{0%{opacity:0;transform:translateY(-50%) scale(.7)}
+    20%{opacity:1;transform:translateY(-50%) scale(1.08)}
     70%{opacity:1;transform:translateY(-50%) scale(1)}
-    100%{opacity:0;transform:translateY(-50%) scale(1)}}
+    100%{opacity:0;transform:translateY(-50%) scale(1.02)}}
 
-  /* 识别中的手印回显 */
   #live{position:absolute;left:0;right:0;bottom:calc(20px + var(--safe-b));z-index:3;text-align:center;
     font-size:13px;letter-spacing:.18em;color:var(--paper-dim);min-height:1.4em}
   #live b{font-weight:400;color:var(--gold)}
   #nohand{color:#7b6f5a}
-
-  /* ---------- 结算 ---------- */
-  #s-end .score{font-size:64px;color:var(--gold-hi);letter-spacing:.06em;line-height:1.1}
-  #s-end .rows{margin:24px 0 6px;font-size:14px;line-height:2.3;color:var(--paper)}
-  #s-end .rows span{color:var(--paper-dim);margin-right:12px;letter-spacing:.2em}
-  #end-title{font-size:15px;letter-spacing:.36em;text-indent:.36em;color:var(--gold)}
-  #s-end .btn{margin-top:26px}
-  #s-end .btn.minor{margin-top:12px}
+  #skip-hint{position:absolute;left:0;right:0;bottom:calc(46px + var(--safe-b));z-index:3;text-align:center;
+    font-size:12px;letter-spacing:.1em;color:#7b6f5a;opacity:0;transition:opacity .6s}
+  #skip-hint.on{opacity:1}
 
   @media (max-height:680px){
-    #p-name{font-size:38px}
-    #verdict{font-size:48px}
+    #p-name{font-size:34px}
+    #verdict{font-size:50px}
   }
 </style>
 </head>
@@ -120,10 +121,10 @@
 
 <!-- 开始 -->
 <section class="screen on" id="s-intro">
-  <span class="kicker">通 神 · 第 二 关</span>
+  <span class="kicker">通 神</span>
   <h1>结 印</h1>
-  <p>三千年前，古蜀祭司以手势通神。<br>碎片沉在暗处，等一个正确的手印。</p>
-  <div class="mudra-preview" id="mp-list"></div>
+  <p>三千年前，古蜀祭司以手势通神。<br>三印一定，唤回一件沉睡的神器。</p>
+  <div id="rite-list"></div>
   <button class="btn" id="btn-start">开 启 摄 像 头</button>
   <div id="cam-pick">
     <select id="cam-select"></select>
@@ -148,29 +149,27 @@
     <div id="finale-title"></div>
     <div id="finale-sub"></div>
     <div id="finale-btns">
-      <button class="btn" id="btn-again">再 结 一 次</button>
-      <button class="btn minor" id="btn-quit">退 出</button>
+      <button class="btn" id="btn-primary"></button>
+      <button class="btn minor" id="btn-again"></button>
     </div>
   </div>
   <div id="hud">
-    <div><div class="lbl">得 分</div><div class="val" id="score">0</div></div>
-    <div id="combo"></div>
-    <div style="text-align:right"><div class="lbl">进 度</div><div class="val" id="progress">1/8</div></div>
+    <div id="rite-name"></div>
+    <div id="rite-bar"></div>
   </div>
-  <div id="timebar"><i id="timebar-i"></i></div>
   <div id="prompt">
-    <div id="p-name">环 握</div>
+    <div id="p-name"></div>
     <div id="p-hint"></div>
     <div id="p-src"></div>
   </div>
   <div id="verdict"></div>
+  <div id="skip-hint">此印久未成 · 轻点屏幕跳过，由推测补全</div>
   <div id="live"><span id="nohand">未见双手</span></div>
 </section>
 
 <script src="./mudra.js?v=2"></script>
 <script src="./lib/three-bundle.js"></script>
-<script src="./assets/mask-glb.js"></script>
-<script src="./summon3d.js?v=1"></script>
-<script type="module" src="./seal.js?v=2"></script>
+<script src="./summon3d.js?v=2"></script>
+<script type="module" src="./seal.js?v=3"></script>
 </body>
 </html>

@@ -1,5 +1,7 @@
-/* 通神 · 第二关「结印」
-   HandLandmarker 实时识别古蜀手印 → 限时结印 → 连击计分 */
+/* 通神 · 结印
+   一件神器一条咒式：三个手印依次结出（每印飞回两块碎片）→ 定印按住聚气 → 神器复原、金光镀金。
+   没有失败：某个印久久结不成，可轻点屏幕跳过，那一段以半透明"推测形态"补全（研究性复原）。
+   用时只决定评级，评级只决定金光强弱，不出分数。 */
 import { FilesetResolver, HandLandmarker } from './lib/mediapipe/vision_bundle.mjs';
 
 const $ = id => document.getElementById(id);
@@ -7,24 +9,55 @@ const show = id => {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
   $(id).classList.add('on');
 };
+const M = id => MUDRAS.find(m => m.id === id);
 
-const ROUNDS = 8;
-const HOLD_FRAMES = 4;        /* 连续命中帧数 → 判定成立（防抖，约 150ms） */
-const T_START = 5200, T_MIN = 2600, T_STEP = 340; /* 每关时限递减 */
+/* ---------- 神器与咒式（文案对照 research.md） ---------- */
+const RITES = [
+  { id: 'mask', name: '纵目面具', glb: './assets/models/mask.glb', fit: 1.0,
+    seq: ['xiangxiang', 'dingzun', 'shuwo'], seal: 'huanwo',
+    sub: '宽 1.38 米 · 眼球外凸 16 厘米',
+    done: '三千年前被打碎掩埋的它，此刻在你掌中重聚' },
+  { id: 'tree', slice: 'y', name: '青铜神树', glb: './assets/models/tree.glb', fit: 2.15,
+    seq: ['huanwo', 'xiangxiang', 'shuwo'], seal: 'dingzun',
+    sub: '高 3.96 米 · 九鸟栖枝 · 一号神树修复用了十余年',
+    done: '九鸟依次点亮，通天之树重立。它是扶桑还是建木，至今无解' },
+  { id: 'figure', slice: 'y', name: '青铜大立人', glb: './assets/models/figure.glb', fit: 2.15,
+    seq: ['xiangxiang', 'shuwo', 'dingzun'], seal: 'huanwo',
+    sub: '通高 2.62 米 · 世界铜像之王 · 禁止出国展览',
+    done: '它与你结着同一个印。手中之物是象牙、玉琮还是权杖，至今无解' },
+  { id: 'bird', slice: 'y', name: '鸟足曲身顶尊神像', glb: './assets/models/bird.glb', fit: 2.15,
+    seq: ['shuwo', 'huanwo', 'xiangxiang'], seal: 'dingzun',
+    sub: '二号坑 · 三号坑 · 八号坑 · 分离三千年后合璧',
+    done: '实体因结构安全无法真正组合，博物馆里那一尊是 3D 打印的研究性复原件' }
+];
+const RATINGS = ['一气呵成', '稍有迟疑', '结印生涩'];
+const RATING_MS = [16000, 32000];          /* 全程用时分界 */
+const HOLD_FRAMES = 4;                     /* 序列印：连续命中帧数（约 150ms） */
+const SEAL_MS = 1100;                      /* 定印：需持续按住的时长 */
+const SKIP_AFTER_MS = 12000;               /* 同一印卡太久 → 允许轻点跳过 */
+
+const params = new URLSearchParams(location.search);
+const fromMain = params.get('from') === 'main';
 
 const state = {
-  landmarker: null, stream: null, running: false,
-  round: 0, score: 0, combo: 0, maxCombo: 0, hits: 0,
-  target: null, tEnd: 0, holdCount: 0, locked: false, rafId: 0, bag: []
+  landmarker: null, stream: null, running: false, rite: null,
+  phase: 'seq', step: 0, target: null, holdCount: 0, holdMs: 0, locked: false,
+  tGame: 0, tStep: 0, ghosts: 0, lastNow: 0, rafId: 0
 };
 
-/* ---------- 开始页：手印预览 ---------- */
-MUDRAS.forEach(m => {
-  const el = document.createElement('div');
-  el.className = 'mp-chip';
-  el.textContent = m.name;
-  $('mp-list').appendChild(el);
-});
+/* ---------- 开始页：选神器 ---------- */
+let riteId = RITES.some(r => r.id === params.get('rite')) ? params.get('rite') : 'mask';
+function renderRiteList() {
+  const box = $('rite-list'); box.innerHTML = '';
+  RITES.forEach(r => {
+    const el = document.createElement('button');
+    el.className = 'rite-chip' + (r.id === riteId ? ' on' : '');
+    el.innerHTML = '<b>' + r.name + '</b><i>' + r.seq.map(id => M(id).name).join(' · ') + ' · 定印 ' + M(r.seal).name + '</i>';
+    el.addEventListener('click', () => { riteId = r.id; renderRiteList(); });
+    box.appendChild(el);
+  });
+}
+renderRiteList();
 
 /* ---------- 音效 ---------- */
 let AC = null;
@@ -42,9 +75,8 @@ function beep(freq, dur, type, vol) {
   g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + (dur || 0.4));
   o.connect(g).connect(a.destination); o.start(); o.stop(a.currentTime + (dur || 0.4) + 0.05);
 }
-const sHit = n => beep(880 + Math.min(n, 8) * 70, 0.45, 'sine', 0.15);
-const sMiss = () => beep(150, 0.35, 'triangle', 0.12);
-const sEnd = () => { [98, 147, 196].forEach((f, i) => setTimeout(() => beep(f, 1.8, 'sine', 0.13 / (i + 1)), i * 60)); };
+const sHit = n => { beep(392 + n * 98, 0.7, 'sine', 0.14); beep(196, 0.5, 'triangle', 0.08); }; /* 铜磬 */
+const sEnd = () => { [98, 147, 196, 294].forEach((f, i) => setTimeout(() => beep(f, 2.2, 'sine', 0.14 / (i + 1)), i * 70)); };
 
 /* ---------- 摄像头 ----------
    不用 facingMode（那是移动端概念，在 Mac 上会挑错设备甚至失败），
@@ -61,7 +93,6 @@ async function openCamera() {
   try {
     return await navigator.mediaDevices.getUserMedia(camConstraints());
   } catch (e) {
-    /* 记住的设备失效（比如 iPhone 拿走了）→ 清掉重来 */
     if (localStorage.getItem(CAM_KEY)) {
       localStorage.removeItem(CAM_KEY);
       return await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
@@ -107,32 +138,40 @@ $('btn-start').addEventListener('click', async () => {
   actx();
   show('s-load');
   try {
-    $('load-bar').style.width = '25%';
+    state.rite = RITES.find(r => r.id === riteId);
+    Summon.init($('scene3d'));
+    const modelReady = Summon.load(state.rite).catch(e => { e.isModel = true; throw e; });
+    modelReady.catch(() => {}); /* 先挂一个空处理，避免摄像头还没开完就报 unhandled rejection */
+    $('load-bar').style.width = '20%';
     const fileset = await FilesetResolver.forVisionTasks('./lib/mediapipe/wasm');
-    $('load-bar').style.width = '55%';
+    $('load-bar').style.width = '50%';
     state.landmarker = await HandLandmarker.createFromOptions(fileset, {
       baseOptions: { modelAssetPath: './lib/mediapipe/hand_landmarker.task', delegate: 'GPU' },
       runningMode: 'VIDEO', numHands: 2,
       minHandDetectionConfidence: 0.5, minHandPresenceConfidence: 0.5, minTrackingConfidence: 0.5
     });
-    $('load-bar').style.width = '78%';
-    state.stream = await openCamera();
-    const cam = $('cam');
-    cam.srcObject = state.stream;
-    await cam.play();
-    await listCameras();  /* 授权后才拿得到设备名 */
+    $('load-bar').style.width = '75%';
+    if (!params.get('nocam')) {          /* ?nocam=1：无摄像头调试，配合 __seal.fakeHands */
+      state.stream = await openCamera();
+      const cam = $('cam');
+      cam.srcObject = state.stream;
+      await cam.play();
+      await listCameras();  /* 授权后才拿得到设备名 */
+    }
+    await modelReady;
     $('load-bar').style.width = '100%';
     setTimeout(startGame, 260);
   } catch (err) {
     show('s-intro');
     $('intro-note').className = 'err';
-    $('intro-note').innerHTML = camError(err);
+    $('intro-note').innerHTML = err && err.isModel
+      ? '<b>神器模型加载失败</b><br>网络不稳或文件缺失，请刷新重试'
+      : camError(err);
     listCameras();
-    console.error('[camera]', err);
+    console.error('[seal] start', err);
   }
 });
 
-/* 切换摄像头：立即换流，并记住选择 */
 $('cam-select').addEventListener('change', async e => {
   localStorage.setItem(CAM_KEY, e.target.value);
   if (state.stream) state.stream.getTracks().forEach(t => t.stop());
@@ -153,7 +192,6 @@ $('btn-redetect').addEventListener('click', async () => {
   $('intro-note').className = '';
   $('intro-note').innerHTML = '正在检测…';
   try {
-    /* 先取一次权限，否则设备名是空的 */
     const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
     s.getTracks().forEach(t => t.stop());
   } catch (e) { /* 无权限也先列一下 */ }
@@ -163,11 +201,9 @@ $('btn-redetect').addEventListener('click', async () => {
     : '仍未检测到摄像头。iPhone 需：同一 Apple ID、蓝牙+Wi-Fi 开启、<b>横放锁屏、背面朝你</b>、靠近 Mac。';
 });
 
-/* 进页面先尝试列一次（无权限时只有占位名，但能看出有没有设备） */
 listCameras();
 
-/* 手机用 http 打开时摄像头必被禁用（非安全上下文）→ 直接给一键跳转 https，
-   避免在地址栏手输 https:// 和端口出错 */
+/* 手机用 http 打开时摄像头必被禁用（非安全上下文）→ 一键跳转 https */
 (function httpsHop() {
   if (window.isSecureContext) return;
   const host = location.hostname;
@@ -184,43 +220,42 @@ listCameras();
     'Safari 点「显示详细信息 → 访问此网站」，Chrome 点「高级 → 继续前往」。';
 })();
 
-/* ---------- 出题：洗牌不重复（沿用 GESTO 98 的 bag 思路） ---------- */
-function pick() {
-  if (!state.bag.length) state.bag = MUDRAS.slice().sort(() => Math.random() - 0.5);
-  const next = state.bag.pop();
-  if (state.target && next.id === state.target.id && state.bag.length) {
-    state.bag.unshift(next);
-    return state.bag.pop();
-  }
-  return next;
+/* ---------- 咒式条（火影式横排） ---------- */
+function renderBar() {
+  const bar = $('rite-bar'); bar.innerHTML = '';
+  const ids = state.rite.seq.concat([state.rite.seal]);
+  ids.forEach((id, i) => {
+    const el = document.createElement('div');
+    const done = state.phase === 'done' || (state.phase === 'seal' ? i < 3 : i < state.step);
+    const cur = (state.phase === 'seq' && i === state.step) || (state.phase === 'seal' && i === 3);
+    el.className = 'rb' + (done ? ' done' : '') + (cur ? ' cur' : '') + (i === 3 ? ' seal' : '');
+    el.textContent = M(id).name;
+    bar.appendChild(el);
+  });
 }
 
 function startGame() {
   show('s-play');
   fitCanvas();
-  Summon.init($('scene3d'));
-  Object.assign(state, { running: true, round: 0, score: 0, combo: 0, maxCombo: 0, hits: 0, bag: [] });
-  $('score').textContent = '0';
-  $('combo').textContent = '';
-  ['prompt', 'timebar', 'live', 'hud'].forEach(id => { $(id).style.display = ''; });
+  Object.assign(state, { running: true, phase: 'seq', step: 0, holdCount: 0, holdMs: 0, locked: false, ghosts: 0 });
+  state.tGame = performance.now(); state.lastNow = 0;
+  ['prompt', 'live', 'hud'].forEach(id => { $(id).style.display = ''; });
+  $('rite-name').textContent = state.rite.name;
   $('finale').classList.remove('on');
-  nextRound();
+  setTarget();
   state.rafId = requestAnimationFrame(loop);
 }
 
-function nextRound() {
-  state.round++;
-  if (state.round > ROUNDS) { endGame(); return; }
-  state.target = pick();
-  state.holdCount = 0;
-  state.locked = false;
-  const limit = Math.max(T_MIN, T_START - (state.round - 1) * T_STEP);
-  state.tEnd = performance.now() + limit;
-  state.tLimit = limit;
-  $('p-name').textContent = [...state.target.name].join(' ');
-  $('p-hint').textContent = state.target.hint;
+function setTarget() {
+  const isSeal = state.phase === 'seal';
+  state.target = M(isSeal ? state.rite.seal : state.rite.seq[state.step]);
+  state.holdCount = 0; state.holdMs = 0; state.locked = false;
+  state.tStep = performance.now();
+  $('p-name').textContent = (isSeal ? '定印 · ' : '') + [...state.target.name].join(' ');
+  $('p-hint').textContent = state.target.hint + (isSeal ? '，按住不动' : '');
   $('p-src').textContent = state.target.source;
-  $('progress').textContent = state.round + '/' + ROUNDS;
+  $('skip-hint').classList.remove('on');
+  renderBar();
 }
 
 function flash(text, cls) {
@@ -228,75 +263,79 @@ function flash(text, cls) {
   v.className = ''; void v.offsetWidth;
   v.textContent = text; v.className = cls;
 }
-
-function onHit() {
-  state.locked = true;
-  state.hits++;
-  state.combo++;
-  state.maxCombo = Math.max(state.maxCombo, state.combo);
-  const left = Math.max(0, state.tEnd - performance.now());
-  const speed = Math.round(120 * (left / state.tLimit));
-  state.score += Math.round((100 + speed) * (1 + (state.combo - 1) * 0.25));
-  $('combo').textContent = state.combo >= 2 ? state.combo + ' 连' : '';
-  sHit(state.combo);
-  /* 整屏金光一闪 + 轻微震屏 + 手机震动：结成的即时反馈 */
+function goldFlash() {
   const fl = $('flash'); fl.classList.remove('go'); void fl.offsetWidth; fl.classList.add('go');
   const sp = $('s-play'); sp.classList.remove('shake'); void sp.offsetWidth; sp.classList.add('shake');
-  if (navigator.vibrate) navigator.vibrate([28, 26, 55]);
-  burst();
-  /* 奖励画面：一块碎片从黑暗中飞回、嵌进面具（取代分数弹窗） */
-  Summon.landShard(state.hits - 1);
-  $('p-name').textContent = '';
-  $('p-hint').textContent = '';
-  $('p-src').textContent = '';
-  setTimeout(nextRound, 900);   /* 留出碎片飞行时间 */
 }
 
-function onMiss() {
+/* 序列印结成（ghost=跳过，以推测形态补全） */
+function onHit(ghost) {
   state.locked = true;
-  state.combo = 0;
-  $('combo').textContent = '';
-  flash('失', 'miss');
-  sMiss();
-  if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
-  setTimeout(nextRound, 700);
+  if (ghost) state.ghosts++;
+  flash([...state.target.name].join(' '), ghost ? 'ghost' : 'hit');
+  if (!ghost) { sHit(state.step); goldFlash(); burst(); if (navigator.vibrate) navigator.vibrate([28, 26, 55]); }
+  const second = state.step * 2 + 1;
+  Summon.landShard(state.step * 2, ghost);
+  setTimeout(() => Summon.landShard(second, ghost), 140);
+  $('p-name').textContent = ''; $('p-hint').textContent = ''; $('p-src').textContent = '';
+  state.step++;
+  renderBar();
+  setTimeout(() => {
+    if (state.step >= 3) state.phase = 'seal';
+    setTarget();
+  }, 800);
 }
 
-/* 结束：不弹分数评价，而是让复原的面具在你眼前亮起 */
-function endGame() {
+/* 定印聚满 → 召唤 */
+function onSealed(ghost) {
+  state.locked = true;
+  state.phase = 'done';
   state.running = false;
-  const allDone = state.hits >= ROUNDS;
-
-  $('prompt').style.display = 'none';
-  $('timebar').style.display = 'none';
-  $('live').style.display = 'none';
-  $('hud').style.display = 'none';
-
-  /* 无论结成几印，面具都要复原、都要有画面：
-     没结出来的部分以半透明"推测形态"补上 —— 这正是博物馆研究性复原的做法 */
-  const missing = allDone ? 0 : Summon.fillMissing();
-  const fillMs = missing * 220 + 900;
-
-  setTimeout(() => {
-    Summon.complete();
-    sEnd();
-    if (navigator.vibrate) navigator.vibrate([60, 40, 140]);
-    const fl = $('flash'); fl.classList.remove('go'); void fl.offsetWidth; fl.classList.add('go');
-  }, allDone ? 0 : fillMs);
+  const used = performance.now() - state.tGame;
+  if (ghost) state.ghosts++;
+  let rating = used < RATING_MS[0] ? 0 : used < RATING_MS[1] ? 1 : 2;
+  if (state.ghosts) rating = Math.max(rating, 1);
+  Summon.charge(0);
+  Summon.landShard(6, ghost); Summon.landShard(7, ghost);
+  flash([...state.target.name].join(' '), ghost ? 'ghost' : 'hit');
+  ['prompt', 'live', 'hud'].forEach(id => { $(id).style.display = 'none'; });
+  $('skip-hint').classList.remove('on');
+  fctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
   setTimeout(() => {
-    $('finale-title').textContent = allDone ? '纵目面具 · 完整复原' : '纵目面具 · 研究性复原';
-    $('finale-sub').innerHTML = allDone
-      ? '八印俱全，三千年前被打碎掩埋的它，此刻在你掌中重聚'
-      : '你唤回了 ' + state.hits + ' 块，其余 ' + missing + ' 块由推测补全<br>' +
-        '<span style="color:#5c6b60">——博物馆里的复原件，也是这样做成的</span>';
+    Summon.complete(rating);
+    sEnd(); goldFlash();
+    if (navigator.vibrate) navigator.vibrate([60, 40, 140, 40, 220]);
+  }, 850);
+
+  setTimeout(() => {
+    const r = state.rite;
+    $('finale-title').textContent = r.name + (state.ghosts ? ' · 研究性复原' : ' · 完整复原');
+    $('finale-sub').innerHTML = '<b>' + RATINGS[rating] + '</b> · ' + r.sub + '<br>' + r.done +
+      (state.ghosts ? '<br><span class="dim">有 ' + state.ghosts + ' 印由推测补全，博物馆里的复原件也是这样做成的</span>' : '');
     $('finale').classList.add('on');
-  }, (allDone ? 0 : fillMs) + 2600);
+  }, 3400);
 }
 
-/* 摄像头一直开着，重开一局直接重载页面重置 3D 场景（最省事、也不会残留状态） */
-$('btn-again').addEventListener('click', () => location.reload());
-$('btn-quit').addEventListener('click', () => location.reload());
+/* 卡太久：轻点屏幕跳过当前印 */
+$('s-play').addEventListener('click', () => {
+  if (!state.running || state.locked) return;
+  if (performance.now() - state.tStep < SKIP_AFTER_MS) return;
+  if (state.phase === 'seal') onSealed(true); else onHit(true);
+});
+
+/* 结尾按钮：来自主流程 → 回到假说剧场；否则 再结一次 / 换一件 */
+if (fromMain) {
+  $('btn-primary').textContent = '那一夜，究竟发生了什么 ▸';
+  $('btn-primary').addEventListener('click', () => { location.href = './index.html#theater'; });
+  $('btn-again').textContent = '再 结 一 次';
+  $('btn-again').addEventListener('click', () => location.reload());
+} else {
+  $('btn-primary').textContent = '再 结 一 次';
+  $('btn-primary').addEventListener('click', () => location.reload());
+  $('btn-again').textContent = '换 一 件 神 器';
+  $('btn-again').addEventListener('click', () => { location.href = location.pathname; });
+}
 
 /* ---------- 画布特效 ---------- */
 const fx = $('fx'), fctx = fx.getContext('2d');
@@ -317,8 +356,30 @@ function burst() {
   }
 }
 
-/* 虚线手位提示：告诉用户手该摆在哪、是拳还是掌
-   画面是镜像的，而手位提示左右基本对称，故直接用屏幕坐标 */
+/* 定印进度环：越满越亮，满了召唤 */
+function drawHoldRing(k, now) {
+  const w = window.innerWidth, h = window.innerHeight;
+  const cx = w / 2, cy = h * 0.52, R = Math.min(w, h) * 0.24;
+  fctx.save();
+  fctx.lineWidth = 3;
+  fctx.strokeStyle = 'rgba(217,178,92,.25)';
+  fctx.beginPath(); fctx.arc(cx, cy, R, 0, Math.PI * 2); fctx.stroke();
+  if (k > 0) {
+    fctx.lineWidth = 5 + k * 4;
+    fctx.strokeStyle = 'rgba(240,212,138,' + (0.6 + k * 0.4) + ')';
+    fctx.shadowColor = 'rgba(240,212,138,.9)'; fctx.shadowBlur = 14 + k * 26;
+    fctx.beginPath(); fctx.arc(cx, cy, R, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k); fctx.stroke();
+    /* 金粉向手心汇聚 */
+    for (let i = 0; i < 2 + k * 6; i++) {
+      const a = Math.random() * Math.PI * 2, d = R * (1.3 + Math.random() * 0.9);
+      parts.push({ x: cx + Math.cos(a) * d, y: cy + Math.sin(a) * d,
+        vx: -Math.cos(a) * (3 + k * 5), vy: -Math.sin(a) * (3 + k * 5), life: 0.6, pull: true });
+    }
+  }
+  fctx.restore();
+}
+
+/* 虚线手位提示：告诉用户手该摆在哪、是拳还是掌 */
 function drawZones(target, hands, now) {
   if (!target || !target.zones) return;
   const w = window.innerWidth, h = window.innerHeight;
@@ -345,7 +406,6 @@ function drawZones(target, hands, now) {
     fctx.shadowBlur = near ? 22 : 8;
     fctx.beginPath(); fctx.arc(zx, zy, R, 0, Math.PI * 2); fctx.stroke();
 
-    /* 圈内画手形符号：拳=实心小圆+横线，掌=五指线 */
     fctx.setLineDash([]);
     fctx.lineWidth = 2;
     fctx.strokeStyle = near ? 'rgba(240,212,138,.9)' : 'rgba(217,178,92,.5)';
@@ -410,15 +470,16 @@ let lastVideoTime = -1;
 function loop(now) {
   if (!state.running) return;
   state.rafId = requestAnimationFrame(loop);
+  const dt = state.lastNow ? Math.min(150, now - state.lastNow) : 16; /* 慢机低帧率时定印仍按真实时间累计 */
+  state.lastNow = now;
 
   const video = $('cam');
   const w = window.innerWidth, h = window.innerHeight;
   fctx.clearRect(0, 0, w, h);
 
-  /* 粒子 */
   parts = parts.filter(p => p.life > 0);
   parts.forEach(p => {
-    p.x += p.vx; p.y += p.vy; p.vy += 0.12; p.life -= 0.022;
+    p.x += p.vx; p.y += p.vy; if (!p.pull) p.vy += 0.12; p.life -= 0.022;
     fctx.fillStyle = 'rgba(240,212,138,' + Math.max(0, p.life) + ')';
     fctx.beginPath(); fctx.arc(p.x, p.y, 2.4, 0, 7); fctx.fill();
   });
@@ -428,44 +489,65 @@ function loop(now) {
     lastVideoTime = video.currentTime;
     try {
       const res = state.landmarker.detectForVideo(video, now);
-      if (res && res.landmarks) {
-        hands = res.landmarks.map((lm, i) => ({
-          landmarks: lm,
-          handedness: res.handednesses && res.handednesses[i] && res.handednesses[i][0]
-            ? res.handednesses[i][0].categoryName : '?'
-        }));
-      }
+      if (res && res.landmarks) hands = res.landmarks.map(lm => ({ landmarks: lm }));
     } catch (e) { /* 掉帧忽略 */ }
   }
-  if (!state.locked) drawZones(state.target, hands, now);
+  if (window.__seal.fakeHands) hands = window.__seal.fakeHands; /* 无摄像头调试：注入合成关键点 */
+
+  const isSeal = state.phase === 'seal';
+  if (!state.locked) {
+    drawZones(state.target, hands, now);
+    if (isSeal) drawHoldRing(state.holdMs / SEAL_MS, now);
+  }
   if (hands.length) drawHands(hands);
 
-  /* 计时条 */
-  if (!state.locked) {
-    const left = Math.max(0, state.tEnd - now);
-    $('timebar-i').style.transform = 'scaleX(' + (left / state.tLimit) + ')';
-    if (left <= 0) { onMiss(); return; }
-  }
-
-  /* 判定 */
   const m = classifyMudra(hands);
   const liveEl = $('live');
   if (!hands.length) {
     liveEl.innerHTML = '<span id="nohand">未见双手</span>';
   } else if (m) {
     const hit = m.id === state.target.id;
-    liveEl.innerHTML = '识出 <b>' + MUDRAS.find(x => x.id === m.id).name + '</b>' + (hit ? ' ✓' : '');
+    liveEl.innerHTML = '识出 <b>' + M(m.id).name + '</b>' + (hit ? ' ✓' : '');
   } else {
     liveEl.innerHTML = '<span id="nohand">' + (hands.length === 1 ? '再抬起另一只手' : '手印未成') + '</span>';
   }
 
-  if (!state.locked && m && m.id === state.target.id) {
-    state.holdCount++;
-    if (state.holdCount >= HOLD_FRAMES) onHit();
-  } else if (state.holdCount > 0) {
-    state.holdCount = Math.max(0, state.holdCount - 1);
+  if (!state.locked) {
+    const matched = m && m.id === state.target.id;
+    if (isSeal) {
+      state.holdMs = matched ? state.holdMs + dt : Math.max(0, state.holdMs - dt * 1.5);
+      Summon.charge(state.holdMs / SEAL_MS);
+      if (state.holdMs >= SEAL_MS) { onSealed(false); return; }
+    } else if (matched) {
+      state.holdCount++;
+      if (state.holdCount >= HOLD_FRAMES) { onHit(false); return; }
+    } else if (state.holdCount > 0) {
+      state.holdCount = Math.max(0, state.holdCount - 1);
+    }
+    if (now - state.tStep > SKIP_AFTER_MS) $('skip-hint').classList.add('on');
   }
 }
 
-/* 调试入口：控制台可查看当前特征、单独预览手位提示 */
-window.__seal = { state, handFeatures, classifyMudra, drawZones, fitCanvas, fctx };
+/* 调试：?nocam=1&auto=1 —— 无摄像头时按时间表自动注入合成手势，跑完整条咒式
+   （本机没有摄像头，无头 Chrome 截图验证全靠它；合成关键点与 mudra-test.html 同源） */
+if (params.get('auto')) {
+  const mk = synthHand; /* 与 mudra-test.html 同一份合成关键点 */
+  const POSES = { huanwo: [mk(.5,.52,true), mk(.5,.66,true)], xiangxiang: [mk(.42,.6,false), mk(.6,.6,false)],
+    dingzun: [mk(.34,.28,false), mk(.66,.28,false)], shuwo: [mk(.5,.55,true)] };
+  const pose = id => { window.__seal.fakeHands = id ? POSES[id] : null; };
+  window.addEventListener('load', () => setTimeout(() => $('btn-start').click(), 300));
+  const plan = () => {
+    const r = state.rite, t = ms => new Promise(res => setTimeout(res, ms));
+    (async () => {
+      await t(600);
+      for (const id of r.seq) { pose(id); await t(500); pose(null); await t(1300); }
+      pose(r.seal); await t(2600); pose(null);
+    })();
+  };
+  const obs = new MutationObserver(() => { if ($('s-play').classList.contains('on') && state.running) { obs.disconnect(); plan(); } });
+  obs.observe($('s-play'), { attributes: true, attributeFilter: ['class'] });
+}
+
+/* 调试入口：控制台可查看当前特征、注入合成手势 */
+window.__seal = { state, RITES, handFeatures, classifyMudra, fitCanvas, fctx, fakeHands: null, loop,
+  start: id => { riteId = id || riteId; renderRiteList(); } };

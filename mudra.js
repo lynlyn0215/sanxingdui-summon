@@ -101,6 +101,25 @@ function classifyMudra(hands) {
   return null;
 }
 
+/* 合成关键点（自检与无摄像头调试共用同一份）：cx/cy 归一化质心，curled 拳/掌，rot 弧度 */
+const CANON = [[0,0],[-.18,-.12],[-.3,-.26],[-.38,-.38],[-.44,-.5],
+  [-.25,-.55],[-.28,-.8],[-.3,-.95],[-.31,-1.1],
+  [0,-.58],[0,-.85],[0,-1.0],[0,-1.18],
+  [.22,-.55],[.25,-.8],[.26,-.94],[.27,-1.08],
+  [.42,-.48],[.46,-.68],[.48,-.8],[.5,-.9]];
+const CURL_IDS = [6,7,8,10,11,12,14,15,16,18,19,20];
+function synthHand(cx, cy, curled, rot) {
+  rot = rot || 0;
+  const s = 0.16;
+  return { landmarks: CANON.map((p, i) => {
+    let [x, y] = p;
+    if (curled && CURL_IDS.includes(i)) { const k = [8,12,16,20].includes(i) ? .42 : .72; x *= k; y *= k; }
+    const c = Math.cos(rot), sn = Math.sin(rot);
+    return { x: cx + (x*c - y*sn)*s, y: cy + (x*sn + y*c)*s, z: 0 };
+  }), handedness: 'Right' };
+}
+
 window.MUDRAS = MUDRAS;
+window.synthHand = synthHand;
 window.classifyMudra = classifyMudra;
 window.handFeatures = handFeatures;

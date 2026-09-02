@@ -27,6 +27,9 @@
   #gate-enter{margin-top:52px}
   #scene-gate .fade-in{animation:fadeUp 1.6s ease both}
   #scene-gate .fade-in2{animation:fadeUp 1.6s .8s ease both}
+  #scene-summon{gap:20px;padding:0 32px}
+  #sm-line{font-size:19px;line-height:2.1;letter-spacing:.14em;color:var(--paper);max-width:22em}
+  #sm-note{font-size:11.5px;letter-spacing:.08em;color:#5c6b60;line-height:1.9}
   @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 
   /* ---- S1 序章：考古现场倒叙 ---- */
@@ -127,6 +130,15 @@
   </div>
 </section>
 
+<!-- S1.5 结印入口：主线走摄像头结印，没有摄像头才退回拖拽复原 -->
+<section class="scene" id="scene-summon">
+  <span class="kicker">通 神</span>
+  <p id="sm-line">六个坑的碎片，正在等一双手。<br>三千年前的祭司以手势通神，<br>现在轮到你。</p>
+  <button class="btn" id="btn-seal">以 手 结 印 ▸</button>
+  <button class="btn minor" id="btn-drag">没有摄像头 · 用手拖拽复原</button>
+  <p id="sm-note">需要摄像头 · 画面只在本机处理，不上传</p>
+</section>
+
 <!-- S2 修复现场 -->
 <section class="scene" id="scene-restore">
   <canvas id="stage"></canvas>
@@ -187,7 +199,6 @@
 </section>
 
 <script src="./lib/three-bundle.js"></script>
-<script src="./assets/mask-glb.js"></script>
 <script src="./restore.js?v=1"></script>
 <script src="./main.js?v=1"></script>
 </body>

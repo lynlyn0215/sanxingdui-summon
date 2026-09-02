@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>模型预览</title>
+<style>
+ body{margin:0;background:#0d0f0e;color:#d9b25c;font:13px ui-monospace,Menlo,monospace}
+ #info{position:fixed;left:12px;top:10px;white-space:pre;line-height:1.7}
+ canvas{display:block}
+</style>
+</head>
+<body>
+<div id="info">loading…</div>
+<script src="./lib/three-bundle.js"></script>
+<script>
+/* 开发用：?glb=assets/models/tree.glb 看单个模型是否能被 three-bundle 正确加载 */
+const url = new URLSearchParams(location.search).get('glb') || 'assets/models/tree.glb';
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight); renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.1, 60);
+camera.position.set(0, 0, 3.6);
+scene.add(new THREE.AmbientLight(0x5a6068, 1.2));
+const key = new THREE.DirectionalLight(0xf0d48a, 2.1); key.position.set(2, 3, 3); scene.add(key);
+const rim = new THREE.PointLight(0x3d7a68, 10, 20); rim.position.set(-3, 1, -2); scene.add(rim);
+let root = null;
+const t0 = performance.now();
+new GLTFLoader().load(url, g => {
+  root = g.scene;
+  const box = new THREE.Box3().setFromObject(root);
+  const size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
+  const s = 2.2 / Math.max(size.x, size.y, size.z);
+  root.position.copy(c).multiplyScalar(-s); root.scale.setScalar(s);
+  scene.add(root);
+  let tris = 0; root.traverse(o => { if (o.isMesh) tris += o.geometry.index ? o.geometry.index.count / 3 : o.geometry.attributes.position.count / 3; });
+  document.getElementById('info').textContent = url + '\nsize ' + size.toArray().map(v => v.toFixed(2)).join(' × ') +
+    '\ntris ' + Math.round(tris) + '\nload ' + Math.round(performance.now() - t0) + ' ms\nOK';
+  window.__model = { root, tris };
+}, undefined, e => { document.getElementById('info').textContent = 'ERROR ' + e; });
+(function tick() { requestAnimationFrame(tick); if (root) root.rotation.y += 0.006; renderer.render(scene, camera); })();
+</script>
+</body>
+</html>

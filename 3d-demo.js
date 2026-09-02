@@ -83,11 +83,7 @@ const SECTORS = 4, LAYERS = 2;
 const SNAP_R = 0.4;
 const SNAP_MS = 200;
 
-const bin = atob(window.MASK_GLB_B64);
-const buf = new Uint8Array(bin.length);
-for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-
-new GLTFLoader().parse(buf.buffer, '', gltf => {
+new GLTFLoader().load('./assets/models/mask.glb', gltf => {
   const root = gltf.scene;
   const box = new THREE.Box3().setFromObject(root);
   const size = box.getSize(new THREE.Vector3()), center = box.getCenter(new THREE.Vector3());
@@ -150,7 +146,7 @@ new GLTFLoader().parse(buf.buffer, '', gltf => {
   state.phase = 'playing';
   $('loading').style.display = 'none';
   updateHud();
-}, err => {
+}, undefined, err => {
   $('loading').textContent = '模型加载失败';
   console.error(err);
 });
