@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import { TreeControl } from '../tree-play.mjs';
+const c = new TreeControl();
+const hand = (pose, x = .5, gap = .12, y = .3) => ({ pose, x, gap, y });
+const frames = (n, input) => { for (let i = 0; i < n; i++) c.update(typeof input === 'function' ? input(i) : input, 1 / 60); };
+frames(120, hand('huanwo')); assert.equal(c.phase, 'gather', '静止摆印不会替代牵引');
+frames(60, i => hand('huanwo', .5 + i * .002)); assert.equal(c.phase, 'join');
+frames(20, hand('xiangxiang', .5, .12)); const tight = c.spread;
+frames(20, hand('xiangxiang', .5, .34)); assert(c.spread > tight, '分掌必须重新散开');
+frames(60, hand('xiangxiang')); assert.equal(c.phase, 'balance');
+frames(120, hand('huanwo')); assert.equal(c.phase, 'balance', '错误手印不能蓄满');
+frames(240, () => hand('dingzun', .5 + .22 * Math.cos((c.age + 1/60) * .7) / 1.6));
+assert.equal(c.phase, 'ready');
+frames(600, null); assert.equal(c.phase, 'ready', '丢手不能释放');
+frames(600, hand('dingzun')); assert.equal(c.phase, 'ready', '蓄满不能自动播放');
+frames(20, hand('open', .5, .2, .5)); assert.equal(c.phase, 'done');
+console.log('神树操控检查通过：牵引、可逆聚合、扶正、丢手保护、主动释放');

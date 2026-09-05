@@ -10,6 +10,9 @@ window.Summon = (function () {
 let renderer, scene, camera, shards = [], full = null, ready = false, rite = null;
 let bursts = [], t0 = 0, completed = false, completeT0 = 0, chargeK = 0;
 let ring = null, ghostObj = null, ghostPivot = null, flourish = [], anyGhost = false;
+let interactive = false, birdShadows = [];
+let spine = null;
+const spinePoint = new THREE.Vector3();
 
 /* 完成后要发金光的网格：完整件的所有 mesh，或（研究性复原时）亲手结成的那些碎片 */
 function glowMeshes() {
@@ -170,6 +173,38 @@ function landShard(i, ghost) {
 }
 
 /* 定印按住时的聚气：k 0→1，碎片发亮抖动，金粉不断向中心汇聚 */
+function manipulate({ phase, x, y, spread, tilt }) {
+  if (!ready || completed) return;
+  interactive = true;
+  if (!spine) {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(SHARD_N * 3), 3));
+    spine = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: 0xf0d48a,
+      transparent: true, opacity: .65, depthTest: false }));
+    scene.add(spine);
+  }
+  spine.visible = phase !== 'gather';
+  shards.forEach((sh, i) => {
+    sh.state = 'controlled';
+    sh.wrap.visible = phase !== 'gather' || i === 3 || spread < .82;
+    const scatter = spread * (phase === 'gather' ? 1 : .8);
+    const angle = i * 2.4;
+    sh.wrap.position.set((x - .5) * .65 + Math.cos(angle) * scatter * .36,
+      (.5 - y) * .28 + Math.sin(angle) * scatter * .18, Math.sin(angle) * scatter * .35);
+    sh.wrap.rotation.set(0, scatter * Math.sin(angle) * .22, phase === 'balance' ? -tilt : 0);
+    sh.wrap.scale.setScalar(.78);
+    sh.mesh.material.opacity = 1;
+    sh.mesh.material.emissive.setHex(0x9f752d);
+    sh.mesh.material.emissiveIntensity = phase === 'ready' ? .28 : .14 + (1 - spread) * .12;
+    syncPlanes(sh);
+    spinePoint.set(0, -(rite.fit / 2) + (i + .5) * rite.fit / SHARD_N, 0);
+    sh.wrap.localToWorld(spinePoint);
+    spine.geometry.attributes.position.setXYZ(i, spinePoint.x, spinePoint.y, spinePoint.z);
+  });
+  spine.geometry.attributes.position.needsUpdate = true;
+  spine.frustumCulled = false;
+}
+
 function charge(k) {
   chargeK = Math.max(0, Math.min(1, k));
   if (!ready || completed) return;
@@ -183,6 +218,7 @@ function charge(k) {
 function complete(rating) {
   if (!ready || completed) return;
   completed = true;
+  if (spine) spine.visible = false;
   completeT0 = performance.now();
   chargeK = 0;
   const power = [1, 0.72, 0.5][rating | 0] || 1;
@@ -203,6 +239,18 @@ function complete(rating) {
 
   /* 神树：九鸟自下而上依次点亮（三层各三只，按高度分批） */
   if (rite.id === 'tree') {
+    if (interactive) {
+      // 金鸟为幻想剪影，不冒充模型中已分离的文物部件。
+      const geometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-.18,.07,0), new THREE.Vector3(-.07,.02,0),
+        new THREE.Vector3(0,0,0), new THREE.Vector3(.07,.02,0), new THREE.Vector3(.18,.07,0)
+      ]);
+      for (let i = 0; i < 9; i++) {
+        const bird = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: 0xffdf94,
+          transparent: true, opacity: 0, depthTest: false }));
+        scene.add(bird); birdShadows.push(bird);
+      }
+    }
     const h = rite.fit || 2.1;
     for (let i = 0; i < 9; i++) {
       const tier = Math.floor(i / 3), side = (i % 3) - 1;
@@ -302,6 +350,22 @@ function tick(now) {
       const power = ring.userData.power || 1;
       if (anyGhost) shards.forEach(sh => { sh.wrap.rotation.y = rot; syncPlanes(sh); });
       else full.rotation.y = rot;
+      if (interactive) {
+        const rise = easeOut(Math.min(1, (now - completeT0) / 2000));
+        full.scale.setScalar(.78 + rise * .55);
+        full.position.y = rise * .22;
+        full.rotation.y = .15 + rise * .25;
+        camera.position.z = 3.6 + rise * .35;
+        camera.lookAt(0, rise * .5, 0);
+        birdShadows.forEach((bird, i) => {
+          const t = (now - completeT0 - 450 - i * 140) / 1700;
+          bird.material.opacity = t > 0 && t < 1 ? Math.sin(t * Math.PI) : 0;
+          bird.position.set(((i % 3) - 1) * (.25 + Math.max(0,t) * .8),
+            -.35 + Math.floor(i / 3) * .45 + t * .5, .2 + t * 3.3);
+          bird.rotation.z = Math.sin(now * .012 + i) * .18;
+          bird.scale.y = .5 + Math.abs(Math.sin(now * .014 + i));
+        });
+      }
       if (ghostPivot) ghostPivot.rotation.y = rot;
       glowMeshes().forEach(m => { m.material.emissiveIntensity = 0.55 * power * (1 - k) + 0.12; });
       /* 冲击环 */
@@ -338,7 +402,7 @@ function tick(now) {
 }
 
 return {
-  init, load, landShard, charge, complete,
+  init, load, landShard, charge, complete, manipulate,
   get ready() { return ready; },
   get shardCount() { return SHARD_N; },
   get dbg() { return { renderer, scene, camera, tick }; } /* 调试：无头截图 / 虚拟时间驱动 */

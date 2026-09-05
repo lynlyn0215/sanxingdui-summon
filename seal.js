@@ -3,6 +3,7 @@
    没有失败：某个印久久结不成，可轻点屏幕跳过，那一段以半透明"推测形态"补全（研究性复原）。
    用时只决定评级，评级只决定金光强弱，不出分数。 */
 import { FilesetResolver, HandLandmarker } from './lib/mediapipe/vision_bundle.mjs';
+import { startTreePlay } from './tree-play.mjs';
 
 const $ = id => document.getElementById(id);
 const show = id => {
@@ -38,6 +39,9 @@ const SKIP_AFTER_MS = 12000;               /* 同一印卡太久 → 允许轻�
 
 const params = new URLSearchParams(location.search);
 const fromMain = params.get('from') === 'main';
+const treeExperiment = params.get('experiment') === 'tree';
+const touchExperiment = treeExperiment && params.get('input') === 'touch';
+let treePlay = null;
 
 const state = {
   landmarker: null, stream: null, running: false, rite: null,
@@ -47,6 +51,7 @@ const state = {
 
 /* ---------- 开始页：选神器 ---------- */
 let riteId = RITES.some(r => r.id === params.get('rite')) ? params.get('rite') : 'mask';
+if (treeExperiment) riteId = 'tree';
 function renderRiteList() {
   const box = $('rite-list'); box.innerHTML = '';
   RITES.forEach(r => {
@@ -58,6 +63,19 @@ function renderRiteList() {
   });
 }
 renderRiteList();
+if (treeExperiment) {
+  document.body.classList.add('tree-experiment');
+  document.querySelector('#s-intro h1').textContent = '掌 中 神 树';
+  document.querySelector('#s-intro p').textContent = '牵引碎片、聚拢枝干、撑住倾斜的神树。最后一刻，由你松手唤醒。';
+  $('rite-list').hidden = true;
+  $('btn-start').textContent = touchExperiment ? '用 手 指 试 玩' : '伸 手 唤 醒';
+  $('intro-note').textContent = touchExperiment ? '触控试玩 · 不开启摄像头' : '摄像头画面只在本机处理 · 双手留在胸前与头侧';
+  $('tree-link').textContent = touchExperiment ? '切换摄像头手势' : '先用触控试手感';
+  $('tree-link').href = touchExperiment ? '?experiment=tree' : '?experiment=tree&input=touch';
+  const note = document.createElement('p');
+  note.className = 'tree-note'; note.textContent = '文物启发的幻想交互 · AI 示意模型，非考古复原';
+  $('s-intro').appendChild(note);
+}
 
 /* ---------- 音效 ---------- */
 let AC = null;
@@ -143,6 +161,7 @@ $('btn-start').addEventListener('click', async () => {
     const modelReady = Summon.load(state.rite).catch(e => { e.isModel = true; throw e; });
     modelReady.catch(() => {}); /* 先挂一个空处理，避免摄像头还没开完就报 unhandled rejection */
     $('load-bar').style.width = '20%';
+    if (!touchExperiment) {
     const fileset = await FilesetResolver.forVisionTasks('./lib/mediapipe/wasm');
     $('load-bar').style.width = '50%';
     state.landmarker = await HandLandmarker.createFromOptions(fileset, {
@@ -150,8 +169,9 @@ $('btn-start').addEventListener('click', async () => {
       runningMode: 'VIDEO', numHands: 2,
       minHandDetectionConfidence: 0.5, minHandPresenceConfidence: 0.5, minTrackingConfidence: 0.5
     });
+    }
     $('load-bar').style.width = '75%';
-    if (!params.get('nocam')) {          /* ?nocam=1：无摄像头调试，配合 __seal.fakeHands */
+    if (!params.get('nocam') && !touchExperiment) { /* ?nocam=1：无摄像头调试 */
       state.stream = await openCamera();
       const cam = $('cam');
       cam.srcObject = state.stream;
@@ -242,7 +262,18 @@ function startGame() {
   ['prompt', 'live', 'hud'].forEach(id => { $(id).style.display = ''; });
   $('rite-name').textContent = state.rite.name;
   $('finale').classList.remove('on');
-  setTarget();
+  if (treeExperiment) {
+    treePlay = startTreePlay({ touch: touchExperiment, video: $('cam'), canvas: fx,
+      sound: () => sHit(0), finish: () => {
+        state.running = false;
+        if (state.stream) state.stream.getTracks().forEach(t => t.stop());
+        if (state.landmarker) { state.landmarker.close(); state.landmarker = null; }
+        $('prompt').style.display = 'none';
+        $('finale-title').textContent = '神树，因你而起';
+        $('finale-sub').textContent = '刚才的牵引与金鸟是幻想演绎。你可以再试一次，看看让它散开再聚合是什么感觉。';
+        $('finale').classList.add('on');
+      } });
+  } else setTarget();
   state.rafId = requestAnimationFrame(loop);
 }
 
@@ -319,6 +350,7 @@ function onSealed(ghost) {
 
 /* 卡太久：轻点屏幕跳过当前印 */
 $('s-play').addEventListener('click', () => {
+  if (treeExperiment) return;
   if (!state.running || state.locked) return;
   if (performance.now() - state.tStep < SKIP_AFTER_MS) return;
   if (state.phase === 'seal') onSealed(true); else onHit(true);
@@ -466,7 +498,7 @@ function drawHands(hands) {
 }
 
 /* ---------- 主循环 ---------- */
-let lastVideoTime = -1;
+let lastVideoTime = -1, cachedHands = [], lastDetection = 0;
 function loop(now) {
   if (!state.running) return;
   state.rafId = requestAnimationFrame(loop);
@@ -484,15 +516,22 @@ function loop(now) {
     fctx.beginPath(); fctx.arc(p.x, p.y, 2.4, 0, 7); fctx.fill();
   });
 
-  let hands = [];
+  let hands = treeExperiment && now - lastDetection < 180 ? cachedHands : [];
   if (state.landmarker && video.readyState >= 2 && video.currentTime !== lastVideoTime) {
     lastVideoTime = video.currentTime;
     try {
       const res = state.landmarker.detectForVideo(video, now);
       if (res && res.landmarks) hands = res.landmarks.map(lm => ({ landmarks: lm }));
+      cachedHands = hands; lastDetection = now;
     } catch (e) { /* 掉帧忽略 */ }
   }
   if (window.__seal.fakeHands) hands = window.__seal.fakeHands; /* 无摄像头调试：注入合成关键点 */
+
+  if (treePlay) {
+    treePlay.update(document.hidden ? [] : hands, now, dt / 1000);
+    state.phase = treePlay.control.phase;
+    return;
+  }
 
   const isSeal = state.phase === 'seal';
   if (!state.locked) {
@@ -530,7 +569,7 @@ function loop(now) {
 
 /* 调试：?nocam=1&auto=1 —— 无摄像头时按时间表自动注入合成手势，跑完整条咒式
    （本机没有摄像头，无头 Chrome 截图验证全靠它；合成关键点与 mudra-test.html 同源） */
-if (params.get('auto')) {
+if (params.get('auto') && !treeExperiment) {
   const mk = synthHand; /* 与 mudra-test.html 同一份合成关键点 */
   const POSES = { huanwo: [mk(.5,.52,true), mk(.5,.66,true)], xiangxiang: [mk(.42,.6,false), mk(.6,.6,false)],
     dingzun: [mk(.34,.28,false), mk(.66,.28,false)], shuwo: [mk(.5,.55,true)] };
@@ -550,4 +589,5 @@ if (params.get('auto')) {
 
 /* 调试入口：控制台可查看当前特征、注入合成手势 */
 window.__seal = { state, RITES, handFeatures, classifyMudra, fitCanvas, fctx, fakeHands: null, loop,
+  get tree() { return treePlay?.control; },
   start: id => { riteId = id || riteId; renderRiteList(); } };
